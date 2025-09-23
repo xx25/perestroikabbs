@@ -1,0 +1,32 @@
+[Unit]
+Description=Perestroika BBS Telnet Server
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+Type=simple
+User=bbs
+Group=bbs
+WorkingDirectory=/opt/perestroika-bbs
+Environment="PATH=/opt/perestroika-bbs/venv/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/opt/perestroika-bbs/venv/bin/python -m bbs.app.main
+Restart=always
+RestartSec=10
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/bbs /var/log/bbs /opt/perestroika-bbs
+
+# Resource limits
+LimitNOFILE=4096
+TimeoutStopSec=30
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

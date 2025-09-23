@@ -1,0 +1,88 @@
+[server]
+host = "0.0.0.0"
+port = 2323
+motd_asset = "ansi/motd.ans"
+max_connections = 100
+connection_timeout = 300  # seconds
+welcome_message = "Welcome to Perestroika BBS!"
+
+[telnet]
+enable_naws = true
+enable_binary = true
+enable_echo = false
+default_cols = 80
+default_rows = 24
+
+[db]
+dsn = "mysql+aiomysql://bbs_user:password@127.0.0.1:3306/perestroika_bbs"
+echo = false
+pool_size = 20
+max_overflow = 10
+pool_timeout = 30
+pool_recycle = 3600
+
+[transfers]
+rz_path = "/usr/bin/rz"
+sz_path = "/usr/bin/sz"
+ckermit_path = "/usr/bin/kermit"
+download_root = "/var/lib/bbs/files"
+upload_root = "/var/lib/bbs/uploads"
+max_upload_size = 10485760  # 10MB
+allowed_extensions = [".txt", ".zip", ".arc", ".lha", ".gif", ".jpg", ".png", ".ans", ".rip"]
+
+[security]
+argon2_time_cost = 3
+argon2_memory_cost = 65536
+argon2_parallelism = 4
+max_login_attempts = 5
+login_throttle_seconds = 60
+session_timeout = 3600
+require_secure_passwords = true
+min_password_length = 8
+
+[charset]
+default_encoding = "utf-8"
+supported_encodings = [
+    "utf-8",
+    "cp437",
+    "iso-8859-1",
+    "iso-8859-2",
+    "iso-8859-5",
+    "iso-8859-7",
+    "koi8-r",
+    "windows-1251",
+    "windows-1252",
+    "macintosh",
+    "shift_jis"
+]
+
+[chat]
+max_message_length = 500
+max_rooms = 50
+default_room = "main"
+enable_whispers = true
+enable_moderator_channel = true
+transcript_batch_size = 100
+transcript_batch_interval = 60  # seconds
+
+[boards]
+max_subject_length = 100
+max_post_length = 10000
+posts_per_page = 20
+enable_attachments = true
+max_attachment_size = 1048576  # 1MB
+enable_moderation = true
+
+[logging]
+level = "INFO"
+format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+file_path = "/var/log/bbs/perestroika.log"
+max_bytes = 10485760
+backup_count = 5
+enable_syslog = false
+
+[ripscrip]
+enable = true
+detect_signature = true
+fallback_to_ansi = true
+asset_cache_size = 100

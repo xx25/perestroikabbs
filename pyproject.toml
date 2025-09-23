@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "perestroika-bbs"
+version = "0.1.0"
+description = "A Python BBS with support for legacy terminals, ANSI art, RIPscrip, and file transfers"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    {name = "BBS Team", email = "admin@example.com"}
+]
+dependencies = [
+    "telnetlib3>=2.0.0",
+    "asyncio>=3.11",
+    "blessed>=1.20.0",
+    "pyte>=0.8.1",
+    "cchardet>=2.1.7",
+    "xmodem>=0.4.6",
+    "SQLAlchemy>=2.0.0",
+    "alembic>=1.12.0",
+    "aiomysql>=0.2.0",
+    "argon2-cffi>=23.1.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "toml>=0.10.2",
+    "aiofiles>=23.2.1",
+    "python-multipart>=0.0.6",
+    "colorama>=0.4.6",
+    "pytz>=2023.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.7.0",
+    "ruff>=0.1.0",
+    "mypy>=1.5.0",
+    "types-toml",
+    "types-pytz",
+    "ipython>=8.14.0",
+]
+
+[project.scripts]
+bbs = "bbs.app.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "N", "B", "A", "C4", "ICN", "PIE", "T20", "SIM", "RET"]
+ignore = ["E501", "B008"]
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_any_unimported = false
+no_implicit_optional = true
+check_untyped_defs = true
+strict_optional = true
