@@ -90,14 +90,31 @@ class AuthManager:
 
 
 class RateLimiter:
-    def __init__(self, max_attempts: int = 5, window_seconds: int = 60):
+    def __init__(self, max_attempts: int = 5, window_seconds: int = 60, ban_duration: int = 3600):
         self.max_attempts = max_attempts
         self.window_seconds = window_seconds
+        self.ban_duration = ban_duration  # Ban duration in seconds
         self.attempts: dict[str, list[float]] = {}
+        self.banned_ips: dict[str, float] = {}  # IP -> ban expiry time
+        self.permanent_bans: set[str] = set()  # Permanently banned IPs
 
     async def check_rate_limit(self, identifier: str) -> bool:
         import time
         current_time = time.time()
+
+        # Check if IP is permanently banned
+        if identifier in self.permanent_bans:
+            logger.warning(f"Permanently banned IP attempted access: {identifier}")
+            return False
+
+        # Check if IP is temporarily banned
+        if identifier in self.banned_ips:
+            if current_time < self.banned_ips[identifier]:
+                logger.warning(f"Temporarily banned IP attempted access: {identifier}")
+                return False
+            else:
+                # Ban has expired, remove it
+                del self.banned_ips[identifier]
 
         if identifier not in self.attempts:
             self.attempts[identifier] = []
@@ -108,6 +125,9 @@ class RateLimiter:
         ]
 
         if len(self.attempts[identifier]) >= self.max_attempts:
+            # Auto-ban after max attempts
+            await self.ban_ip(identifier, self.ban_duration)
+            logger.warning(f"IP {identifier} auto-banned after {self.max_attempts} attempts")
             return False
 
         self.attempts[identifier].append(current_time)
@@ -116,3 +136,92 @@ class RateLimiter:
     async def reset(self, identifier: str) -> None:
         if identifier in self.attempts:
             del self.attempts[identifier]
+
+    async def ban_ip(self, ip: str, duration: Optional[int] = None) -> None:
+        """Ban an IP address for a specified duration or permanently"""
+        import time
+        if duration is None:
+            # Permanent ban
+            self.permanent_bans.add(ip)
+            logger.info(f"IP {ip} permanently banned")
+        else:
+            # Temporary ban
+            self.banned_ips[ip] = time.time() + duration
+            logger.info(f"IP {ip} banned for {duration} seconds")
+
+    async def unban_ip(self, ip: str) -> bool:
+        """Remove an IP from the ban list"""
+        removed = False
+        if ip in self.permanent_bans:
+            self.permanent_bans.remove(ip)
+            removed = True
+        if ip in self.banned_ips:
+            del self.banned_ips[ip]
+            removed = True
+        if removed:
+            logger.info(f"IP {ip} unbanned")
+        return removed
+
+    async def is_banned(self, ip: str) -> bool:
+        """Check if an IP is currently banned"""
+        import time
+        if ip in self.permanent_bans:
+            return True
+        if ip in self.banned_ips:
+            if time.time() < self.banned_ips[ip]:
+                return True
+            else:
+                # Ban expired, clean up
+                del self.banned_ips[ip]
+        return False
+
+    async def get_banned_ips(self) -> dict:
+        """Get list of all banned IPs with their status"""
+        import time
+        current_time = time.time()
+        result = {}
+
+        for ip in self.permanent_bans:
+            result[ip] = {'type': 'permanent', 'expires': None}
+
+        for ip, expiry in list(self.banned_ips.items()):
+            if current_time < expiry:
+                result[ip] = {
+                    'type': 'temporary',
+                    'expires': expiry,
+                    'remaining': int(expiry - current_time)
+                }
+            else:
+                # Expired, remove
+                del self.banned_ips[ip]
+
+        return result
+
+    async def save_bans(self, filepath: str) -> None:
+        """Save ban list to file for persistence"""
+        import json
+        data = {
+            'permanent_bans': list(self.permanent_bans),
+            'temporary_bans': self.banned_ips
+        }
+        try:
+            with open(filepath, 'w') as f:
+                json.dump(data, f)
+        except Exception as e:
+            logger.error(f"Failed to save ban list: {e}")
+
+    async def load_bans(self, filepath: str) -> None:
+        """Load ban list from file"""
+        import json
+        import os
+        if not os.path.exists(filepath):
+            return
+
+        try:
+            with open(filepath, 'r') as f:
+                data = json.load(f)
+                self.permanent_bans = set(data.get('permanent_bans', []))
+                self.banned_ips = data.get('temporary_bans', {})
+                logger.info(f"Loaded {len(self.permanent_bans)} permanent bans, {len(self.banned_ips)} temporary bans")
+        except Exception as e:
+            logger.error(f"Failed to load ban list: {e}")

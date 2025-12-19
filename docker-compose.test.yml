@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  mysql-test:
+    image: mysql:8.0
+    container_name: perestroika-mysql-test
+    environment:
+      MYSQL_ROOT_PASSWORD: testpassword
+      MYSQL_DATABASE: perestroika_bbs_test
+      MYSQL_USER: bbs_test
+      MYSQL_PASSWORD: bbstestpass
+    networks:
+      - test_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 5
+
+  bbs-test:
+    build: .
+    container_name: perestroika-bbs-test
+    depends_on:
+      mysql-test:
+        condition: service_healthy
+    environment:
+      - BBS_DB_HOST=mysql-test
+      - BBS_DB_PORT=3306
+      - BBS_DB_USER=bbs_test
+      - BBS_DB_PASSWORD=bbstestpass
+      - BBS_DB_NAME=perestroika_bbs_test
+    volumes:
+      - ./config.docker.toml:/app/config.toml:ro
+    networks:
+      - test_network
+    ports:
+      - "2324:2323"  # Different port for testing
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: tests/Dockerfile.test
+    container_name: bbs-test-runner
+    depends_on:
+      - bbs-test
+    environment:
+      - BBS_HOST=bbs-test
+      - BBS_PORT=2323
+    volumes:
+      - ./tests:/tests
+      - ./test-results:/test-results
+    networks:
+      - test_network
+    command: >
+      sh -c "
+        echo 'Waiting for BBS to start...' &&
+        sleep 10 &&
+        echo 'Running tests...' &&
+        python -m pytest /tests/test_bbs_integration.py -v --tb=short --junit-xml=/test-results/junit.xml --html=/test-results/report.html --self-contained-html
+      "
+
+networks:
+  test_network:
+    driver: bridge

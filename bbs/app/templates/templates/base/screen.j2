@@ -1,0 +1,5 @@
+{# Base template for all screens #}
+{% if ansi_enabled %}{{ ansi.clear() }}{% endif %}
+{% block header %}{% endblock %}
+{% block content %}{% endblock %}
+{% block footer %}{% endblock %}

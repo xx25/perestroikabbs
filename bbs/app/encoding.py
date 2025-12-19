@@ -38,6 +38,7 @@ class CharsetManager:
     COMMON_ENCODINGS = [
         ("UTF-8", "utf-8"),
         ("CP437 (DOS)", "cp437"),
+        ("CP866 (DOS Russian)", "cp866"),
         ("ISO-8859-1 (Latin-1)", "iso-8859-1"),
         ("ISO-8859-2 (Central European)", "iso-8859-2"),
         ("ISO-8859-5 (Cyrillic)", "iso-8859-5"),
@@ -46,6 +47,7 @@ class CharsetManager:
         ("Windows-1251 (Cyrillic)", "windows-1251"),
         ("Windows-1252 (Western)", "windows-1252"),
         ("MacRoman", "macintosh"),
+        ("MacCyrillic", "x-mac-cyrillic"),
         ("Shift_JIS (Japanese)", "shift_jis"),
     ]
 

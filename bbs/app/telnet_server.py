@@ -30,9 +30,11 @@ class TelnetServer:
         try:
             await session.negotiate()
 
-            await self.show_motd(session)
-
+            # Don't show MOTD yet - let user configure charset/language first
             login_ui = LoginUI(session, self.charset_manager)
+
+            # LoginUI will handle charset, language, terminal setup first
+            # Then show MOTD with proper encoding
             authenticated = await login_ui.run()
 
             if authenticated:
@@ -116,6 +118,9 @@ class TelnetServer:
             shell=self.shell,
             connect_maxwait=3.0,
             timeout=self.config.server.connection_timeout,
+            encoding='utf-8',  # Use UTF-8 for proper Unicode support
+            encoding_errors='replace',  # Replace errors instead of failing
+            force_binary=True,  # Force binary mode for UTF-8 to work properly
         )
 
         self._running = True

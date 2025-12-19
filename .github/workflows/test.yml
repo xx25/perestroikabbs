@@ -1,0 +1,96 @@
+name: BBS Integration Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Build BBS Docker Image
+      run: docker compose build
+
+    - name: Start BBS Services
+      run: docker compose up -d
+
+    - name: Wait for BBS to be ready
+      run: |
+        echo "Waiting for BBS to start..."
+        for i in {1..30}; do
+          if nc -zv localhost 2323 2>/dev/null; then
+            echo "BBS is ready!"
+            break
+          fi
+          echo "Waiting... ($i/30)"
+          sleep 2
+        done
+
+    - name: Run Basic Connectivity Tests
+      run: |
+        chmod +x tests/simple_test.sh
+        ./tests/simple_test.sh
+
+    - name: Check BBS Logs
+      if: always()
+      run: docker compose logs bbs --tail 50
+
+    - name: Stop Services
+      if: always()
+      run: docker compose down
+
+  test-comprehensive:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install test dependencies
+      run: |
+        pip install pexpect pytest pytest-timeout pytest-html
+
+    - name: Build and Start Test Environment
+      run: |
+        docker compose -f docker-compose.test.yml build
+        docker compose -f docker-compose.test.yml up -d bbs-test mysql-test
+
+    - name: Wait for services
+      run: |
+        echo "Waiting for test BBS..."
+        sleep 15
+        docker compose -f docker-compose.test.yml ps
+
+    - name: Run Integration Tests
+      run: |
+        export BBS_HOST=localhost
+        export BBS_PORT=2324
+        pytest tests/test_bbs_integration.py -v --tb=short --junit-xml=test-results.xml
+
+    - name: Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results
+        path: test-results.xml
+
+    - name: Show Test Logs
+      if: failure()
+      run: |
+        docker compose -f docker-compose.test.yml logs bbs-test --tail 100
+
+    - name: Cleanup
+      if: always()
+      run: docker compose -f docker-compose.test.yml down -v

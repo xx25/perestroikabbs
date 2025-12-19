@@ -137,6 +137,31 @@ class UserRepository:
             )
             await session.commit()
 
+    async def update_terminal_settings(
+        self,
+        user_id: int,
+        encoding: Optional[str] = None,
+        cols: Optional[int] = None,
+        rows: Optional[int] = None
+    ) -> None:
+        """Update user's terminal preferences"""
+        async with get_session() as session:
+            values = {}
+            if encoding is not None:
+                values['encoding_pref'] = encoding
+            if cols is not None:
+                values['terminal_cols'] = cols
+            if rows is not None:
+                values['terminal_rows'] = rows
+
+            if values:
+                await session.execute(
+                    update(User)
+                    .where(User.id == user_id)
+                    .values(**values)
+                )
+                await session.commit()
+
 
 class BoardRepository:
     async def create_board(
@@ -496,9 +521,46 @@ class FileRepository:
             )
             return result.scalars().all()
 
+    async def search_files_with_areas(
+        self, query: str, user_access_level: int = 0
+    ) -> List[tuple]:
+        """Search files with area names included (avoids N+1 queries).
+
+        Returns list of (File, area_name) tuples.
+        """
+        async with get_session() as session:
+            # Search files with a JOIN to get area names in a single query
+            result = await session.execute(
+                select(File, FileArea.name)
+                .join(FileArea, File.area_id == FileArea.id)
+                .where(
+                    and_(
+                        FileArea.min_access <= user_access_level,
+                        File.is_deleted == False,
+                        or_(
+                            File.filename.ilike(f"%{query}%"),
+                            File.description.ilike(f"%{query}%")
+                        )
+                    )
+                )
+                .order_by(File.upload_date.desc())
+                .limit(50)
+            )
+            return result.all()
+
 
 class SystemRepository:
     async def get_stats(self) -> dict:
+        """Get system statistics.
+
+        NOTE: This method issues multiple sequential COUNT queries which
+        may become slow as the database grows. For better performance at
+        scale, consider:
+        1. Caching stats with a short TTL (e.g., 60 seconds)
+        2. Using a single query with subqueries
+        3. Maintaining a stats table updated by triggers
+        4. Running counts in parallel with asyncio.gather()
+        """
         async with get_session() as session:
             total_users = await session.scalar(
                 select(func.count(User.id)).where(User.status == UserStatus.ACTIVE)

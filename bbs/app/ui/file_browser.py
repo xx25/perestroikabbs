@@ -193,19 +193,19 @@ class FileBrowser:
         query = await self.session.readline("Search for: ")
 
         if query:
-            # Search files
-            files = await self.file_repo.search_files(query, self.session.access_level)
+            # Search files with area names in a single query (avoids N+1)
+            results = await self.file_repo.search_files_with_areas(
+                query, self.session.access_level
+            )
 
-            if files:
-                await self.session.writeline(f"\r\nFound {len(files)} file(s):")
+            if results:
+                await self.session.writeline(f"\r\nFound {len(results)} file(s):")
                 await self.session.writeline()
 
                 await self.session.writeline(f"{'Filename':<30} {'Size':<10} {'Area':<15} {'Date':<12}")
                 await self.session.writeline("-" * 67)
 
-                for file in files[:20]:  # Limit to first 20 results
-                    area = await self.file_repo.get_area(file.area_id)
-                    area_name = area.name if area else "Unknown"
+                for file, area_name in results[:20]:  # Limit to first 20 results
                     size_str = self.format_size(file.size)
                     date_str = file.upload_date.strftime("%Y-%m-%d")
 
@@ -224,7 +224,14 @@ class FileBrowser:
 
     async def download_via_xmodem(self, file) -> None:
         """Download file using XMODEM protocol"""
-        file_path = Path(self.config.transfers.download_root) / file.logical_path
+        download_root = Path(self.config.transfers.download_root).resolve()
+        file_path = (download_root / file.logical_path).resolve()
+
+        # Sandbox check - ensure file is within download root
+        if not self._is_path_within(file_path, download_root):
+            logger.warning(f"Path traversal attempt in XMODEM download: {file.logical_path}")
+            await self.session.writeline(f"\r\nError: Access denied")
+            return
 
         if not file_path.exists():
             await self.session.writeline(f"\r\nError: File not found on disk")
@@ -249,7 +256,14 @@ class FileBrowser:
 
     async def download_via_zmodem(self, file) -> None:
         """Download file using ZMODEM protocol"""
-        file_path = Path(self.config.transfers.download_root) / file.logical_path
+        download_root = Path(self.config.transfers.download_root).resolve()
+        file_path = (download_root / file.logical_path).resolve()
+
+        # Sandbox check - ensure file is within download root
+        if not self._is_path_within(file_path, download_root):
+            logger.warning(f"Path traversal attempt in ZMODEM download: {file.logical_path}")
+            await self.session.writeline(f"\r\nError: Access denied")
+            return
 
         if not file_path.exists():
             await self.session.writeline(f"\r\nError: File not found on disk")
@@ -272,7 +286,14 @@ class FileBrowser:
 
     async def download_via_kermit(self, file) -> None:
         """Download file using Kermit protocol"""
-        file_path = Path(self.config.transfers.download_root) / file.logical_path
+        download_root = Path(self.config.transfers.download_root).resolve()
+        file_path = (download_root / file.logical_path).resolve()
+
+        # Sandbox check - ensure file is within download root
+        if not self._is_path_within(file_path, download_root):
+            logger.warning(f"Path traversal attempt in Kermit download: {file.logical_path}")
+            await self.session.writeline(f"\r\nError: Access denied")
+            return
 
         if not file_path.exists():
             await self.session.writeline(f"\r\nError: File not found on disk")
@@ -295,10 +316,24 @@ class FileBrowser:
 
     async def upload_via_xmodem(self, area, filename: str, description: str) -> None:
         """Upload file using XMODEM protocol"""
-        upload_dir = Path(self.config.transfers.upload_root) / str(area.id)
+        # Sanitize filename - extract just the basename to prevent path traversal
+        safe_filename = Path(filename).name
+        if not safe_filename or safe_filename in ('.', '..'):
+            await self.session.writeline("\r\nError: Invalid filename")
+            return
+
+        upload_root = Path(self.config.transfers.upload_root).resolve()
+        upload_dir = (upload_root / str(area.id)).resolve()
+
+        # Verify upload_dir is within upload_root
+        if not self._is_path_within(upload_dir, upload_root):
+            logger.warning(f"Path traversal attempt in XMODEM upload area: {area.id}")
+            await self.session.writeline("\r\nError: Access denied")
+            return
+
         upload_dir.mkdir(parents=True, exist_ok=True)
 
-        file_path = upload_dir / filename
+        file_path = upload_dir / safe_filename
         xmodem = XModemProtocol(self.session)
 
         success = await xmodem.receive_file(file_path)
@@ -306,18 +341,18 @@ class FileBrowser:
         if success and file_path.exists():
             # Add file to database
             file_size = file_path.stat().st_size
-            logical_path = f"{area.id}/{filename}"
+            logical_path = f"{area.id}/{safe_filename}"
 
             file_record = await self.file_repo.create_file(
                 area_id=area.id,
-                filename=filename,
+                filename=safe_filename,
                 logical_path=logical_path,
                 size=file_size,
                 uploader_id=self.session.user_id,
                 description=description
             )
 
-            await self.session.writeline(f"\r\nFile '{filename}' uploaded successfully!")
+            await self.session.writeline(f"\r\nFile '{safe_filename}' uploaded successfully!")
 
             # Log transfer
             await self.file_repo.log_transfer(
@@ -332,11 +367,22 @@ class FileBrowser:
 
     async def upload_via_zmodem(self, area, filename: str, description: str) -> None:
         """Upload file using ZMODEM protocol"""
-        upload_dir = Path(self.config.transfers.upload_root) / str(area.id)
+        # Sanitize filename - extract just the basename to prevent path traversal
+        safe_filename = Path(filename).name if filename else None
+
+        upload_root = Path(self.config.transfers.upload_root).resolve()
+        upload_dir = (upload_root / str(area.id)).resolve()
+
+        # Verify upload_dir is within upload_root
+        if not self._is_path_within(upload_dir, upload_root):
+            logger.warning(f"Path traversal attempt in ZMODEM upload area: {area.id}")
+            await self.session.writeline("\r\nError: Access denied")
+            return
+
         upload_dir.mkdir(parents=True, exist_ok=True)
 
         zmodem = ZModemTransfer(self.session)
-        success = await zmodem.receive_file(upload_dir, filename)
+        success = await zmodem.receive_file(upload_dir, safe_filename)
 
         if success:
             # Check for uploaded files
@@ -367,7 +413,15 @@ class FileBrowser:
 
     async def upload_via_kermit(self, area, filename: str, description: str) -> None:
         """Upload file using Kermit protocol"""
-        upload_dir = Path(self.config.transfers.upload_root) / str(area.id)
+        upload_root = Path(self.config.transfers.upload_root).resolve()
+        upload_dir = (upload_root / str(area.id)).resolve()
+
+        # Verify upload_dir is within upload_root
+        if not self._is_path_within(upload_dir, upload_root):
+            logger.warning(f"Path traversal attempt in Kermit upload area: {area.id}")
+            await self.session.writeline("\r\nError: Access denied")
+            return
+
         upload_dir.mkdir(parents=True, exist_ok=True)
 
         kermit = KermitTransfer(self.session)
@@ -399,6 +453,24 @@ class FileBrowser:
                         status="completed",
                         remote_addr=self.session.remote_addr
                     )
+
+    @staticmethod
+    def _is_path_within(path: Path, parent: Path) -> bool:
+        """Check if path is within parent directory (safe path containment check).
+
+        Uses Path.is_relative_to() which properly handles edge cases like
+        /var/downloads_evil not being within /var/downloads.
+        """
+        try:
+            # is_relative_to() was added in Python 3.9
+            return path.is_relative_to(parent)
+        except AttributeError:
+            # Fallback for Python < 3.9: use parts comparison
+            try:
+                path.relative_to(parent)
+                return True
+            except ValueError:
+                return False
 
     @staticmethod
     def format_size(size: int) -> str:

@@ -96,7 +96,7 @@ class XModemProtocol:
             await self.session.writeline("Start your XMODEM send now...")
 
             # Send initial NAK or 'C' for CRC mode
-            await self.session.write(b'C' if self.use_crc else bytes([self.NAK]))
+            await self.session.write_raw(b'C' if self.use_crc else bytes([self.NAK]))
 
             received_data = bytearray()
             self.block_num = 1
@@ -108,14 +108,14 @@ class XModemProtocol:
                 header = await self._read_with_timeout(1)
                 if not header:
                     retries += 1
-                    await self.session.write(bytes([self.NAK]))
+                    await self.session.write_raw(bytes([self.NAK]))
                     continue
 
                 header_byte = header[0]
 
                 # Check for EOT
                 if header_byte == self.EOT:
-                    await self.session.write(bytes([self.ACK]))
+                    await self.session.write_raw(bytes([self.ACK]))
                     break
 
                 # Check for Cancel
@@ -130,14 +130,14 @@ class XModemProtocol:
                     block_size = 1024
                 else:
                     retries += 1
-                    await self.session.write(bytes([self.NAK]))
+                    await self.session.write_raw(bytes([self.NAK]))
                     continue
 
                 # Read rest of block
                 block_data = await self._receive_block(block_size)
                 if block_data:
                     received_data.extend(block_data)
-                    await self.session.write(bytes([self.ACK]))
+                    await self.session.write_raw(bytes([self.ACK]))
                     self.block_num += 1
                     retries = 0
 
@@ -147,7 +147,7 @@ class XModemProtocol:
                         await self.session.write(f"\rProgress: {progress}%")
                 else:
                     retries += 1
-                    await self.session.write(bytes([self.NAK]))
+                    await self.session.write_raw(bytes([self.NAK]))
 
             if retries >= max_retries:
                 await self.session.writeline("\r\nToo many errors, transfer aborted")
@@ -202,7 +202,7 @@ class XModemProtocol:
         # Send packet and wait for ACK
         retries = 0
         while retries < 10:
-            await self.session.write(packet)
+            await self.session.write_raw(packet)
 
             response = await self._read_with_timeout(1)
             if response and response[0] == self.ACK:
@@ -260,7 +260,7 @@ class XModemProtocol:
         """Send End of Transmission"""
         retries = 0
         while retries < 10:
-            await self.session.write(bytes([self.EOT]))
+            await self.session.write_raw(bytes([self.EOT]))
             response = await self._read_with_timeout(1)
             if response and response[0] == self.ACK:
                 return True
@@ -268,15 +268,8 @@ class XModemProtocol:
         return False
 
     async def _read_with_timeout(self, size: int, timeout: float = 10.0) -> Optional[bytes]:
-        """Read data with timeout"""
-        try:
-            data = await asyncio.wait_for(
-                self.session.reader.read(size),
-                timeout=timeout
-            )
-            return data if data else None
-        except asyncio.TimeoutError:
-            return None
+        """Read raw binary data with timeout"""
+        return await self.session.read_raw(size, timeout)
 
     @staticmethod
     def _calculate_crc(data: bytes) -> int:

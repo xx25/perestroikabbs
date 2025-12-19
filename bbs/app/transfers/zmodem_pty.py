@@ -24,6 +24,18 @@ class ZModemTransfer:
         self.slave_fd: Optional[int] = None
         self.process: Optional[asyncio.subprocess.Process] = None
 
+    @staticmethod
+    def _is_path_within(path: Path, parent: Path) -> bool:
+        """Check if path is within parent directory (safe path containment check)."""
+        try:
+            return path.is_relative_to(parent)
+        except AttributeError:
+            try:
+                path.relative_to(parent)
+                return True
+            except ValueError:
+                return False
+
     async def send_file(self, file_path: Path) -> bool:
         """Send a file using ZMODEM (sz)"""
         if not file_path.exists():
@@ -40,7 +52,7 @@ class ZModemTransfer:
             # Sandbox check - ensure file is in allowed directory
             download_root = Path(self.config.download_root).resolve()
             file_path = file_path.resolve()
-            if not str(file_path).startswith(str(download_root)):
+            if not self._is_path_within(file_path, download_root):
                 logger.warning(f"Attempted to send file outside download root: {file_path}")
                 await self.session.writeline("\r\nError: Access denied")
                 return False
@@ -105,7 +117,7 @@ class ZModemTransfer:
             upload_root = Path(self.config.upload_root).resolve()
             save_dir = save_dir.resolve()
 
-            if not str(save_dir).startswith(str(upload_root)):
+            if not self._is_path_within(save_dir, upload_root):
                 logger.warning(f"Attempted to save file outside upload root: {save_dir}")
                 await self.session.writeline("\r\nError: Access denied")
                 return False
@@ -181,8 +193,6 @@ class ZModemTransfer:
 
     async def _pump_data(self) -> bool:
         """Pump data between PTY and telnet session"""
-        loop = asyncio.get_event_loop()
-
         try:
             while self.process and self.process.returncode is None:
                 # Check if process is still running
@@ -193,20 +203,14 @@ class ZModemTransfer:
                 try:
                     data = os.read(self.master_fd, 4096)
                     if data:
-                        await self.session.write(data)
+                        await self.session.write_raw(data)
                 except BlockingIOError:
                     pass
 
                 # Read from telnet and send to PTY master
-                try:
-                    telnet_data = await asyncio.wait_for(
-                        self.session.reader.read(4096),
-                        timeout=0.1
-                    )
-                    if telnet_data:
-                        os.write(self.master_fd, telnet_data)
-                except asyncio.TimeoutError:
-                    pass
+                telnet_data = await self.session.read_raw(4096, timeout=0.1)
+                if telnet_data:
+                    os.write(self.master_fd, telnet_data)
 
                 # Small delay to prevent CPU spinning
                 await asyncio.sleep(0.01)

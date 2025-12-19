@@ -1,11 +1,13 @@
 import asyncio
 from typing import Optional
+from pathlib import Path
 
 from ..encoding import CharsetManager
 from ..session import Session
 from ..storage.repositories import UserRepository
 from ..security.auth import AuthManager
 from ..utils.logger import get_logger
+from ..utils.config import get_config
 
 logger = get_logger("ui.login")
 
@@ -19,20 +21,33 @@ class LoginUI:
         self.max_attempts = 3
 
     async def run(self) -> bool:
+        # 0. Show ASCII-only welcome screen (works on ANY terminal)
+        await self.show_welcome()
+
+        # 1. Select charset FIRST - so we can display language names correctly
         await self.select_encoding()
 
+        # 2. Select display mode (resolution + ANSI)
+        await self.select_display_mode()
+
+        # 3. Select language - now we can show it in proper charset
+        await self.select_language()
+
+        # 4. NOW show MOTD using templates
+        await self.show_motd_template()
+
         await self.session.writeline()
-        await self.session.writeline("Please log in or register for a new account.")
+        await self.session.writeline(self.session.t('login.title'))
         await self.session.writeline()
 
         options = [
-            ("L", "Login with existing account"),
-            ("N", "New user registration"),
-            ("G", "Guest login"),
-            ("Q", "Quit"),
+            ("L", self.session.t('login.login_option')),
+            ("N", self.session.t('login.register_option')),
+            ("G", self.session.t('login.guest_option')),
+            ("Q", self.session.t('login.quit_option')),
         ]
 
-        choice = await self.session.menu_select(options, "\r\nYour choice: ")
+        choice = await self.session.menu_select(options, f"\r\n{self.session.t('login.your_choice')}: ")
 
         if choice == "L":
             return await self.login()
@@ -43,20 +58,61 @@ class LoginUI:
         else:
             return False
 
-    async def select_encoding(self) -> None:
-        await self.session.writeline("\r\nSelect your terminal encoding:")
+    async def select_language(self) -> None:
+        """Allow user to select interface language - now charset is known"""
         await self.session.writeline()
+
+        # Now we can display language names in their native scripts
+        # because charset has already been selected
+        if self.session.capabilities.encoding in ['utf-8', 'windows-1251', 'koi8-r']:
+            await self.session.writeline("Select your language / Выберите язык / 选择语言:")
+            await self.session.writeline()
+            await self.session.writeline("  [1] English")
+            await self.session.writeline("  [2] Русский (Russian)")
+            await self.session.writeline("  [3] 中文 (Chinese)")
+            await self.session.writeline("  [4] Español (Spanish)")
+            await self.session.writeline("  [5] Français (French)")
+        else:
+            # ASCII or CP437 - use only ASCII characters
+            await self.session.writeline("Select your language:")
+            await self.session.writeline()
+            await self.session.writeline("  [1] English")
+            await self.session.writeline("  [2] Russian")
+            await self.session.writeline("  [3] Chinese")
+            await self.session.writeline("  [4] Spanish")
+            await self.session.writeline("  [5] French")
+        await self.session.writeline()
+
+        choice = await self.session.readline("Choice [1-5]: ")
+
+        language_map = {
+            "1": "en",
+            "2": "ru",
+            "3": "zh",
+            "4": "es",
+            "5": "fr"
+        }
+
+        selected_lang = language_map.get(choice, "en")
+        self.session.set_language(selected_lang)
+
+    async def select_encoding(self) -> None:
+        # Use simple ASCII for charset selection since we don't know encoding yet
+        logger.info(f"Starting charset selection for session {self.session.id}")
+        await self.session.writeline("\r\nSelect charset:")
 
         encodings = self.charset_manager.get_encoding_menu()
+        # Make menu more compact for 40-column display
         for i, (display, _) in enumerate(encodings, 1):
-            await self.session.writeline(f"  [{i}] {display}")
+            # Shorten display names for compact view
+            short_display = display.replace("(default)", "").strip()
+            await self.session.writeline(f" [{i}] {short_display}")
 
-        await self.session.writeline(f"  [0] Auto-detect")
-        await self.session.writeline(f"  [7] 7-bit ASCII only (legacy terminals)")
-        await self.session.writeline()
+        await self.session.writeline(f" [0] Auto-detect")
+        await self.session.writeline(f" [7] 7-bit ASCII only")
 
         while True:
-            choice = await self.session.readline("Selection (0-" + str(len(encodings)) + ", 7 for 7-bit): ")
+            choice = await self.session.readline("Choice: ")
 
             try:
                 idx = int(choice)
@@ -86,10 +142,49 @@ class LoginUI:
                     await self.session.writeline(f"Encoding set to {encodings[idx - 1][0]}")
                     break
                 else:
-                    await self.session.writeline("Invalid selection.")
+                    await self.session.writeline(self.session.t('common.invalid_choice'))
 
             except ValueError:
-                await self.session.writeline("Please enter a number.")
+                await self.session.writeline(self.session.t('common.invalid_input'))
+
+    async def select_display_mode(self) -> None:
+        """Allow user to select terminal display mode (size + ANSI support)"""
+        await self.session.writeline()
+        await self.session.writeline("Select your terminal configuration:")
+        await self.session.writeline()
+        await self.session.writeline("  [1] 80x24 with ANSI colors (Recommended)")
+        await self.session.writeline("  [2] 80x24 plain text (No colors)")
+        await self.session.writeline("  [3] 40x24 with ANSI colors (Narrow color)")
+        await self.session.writeline("  [4] 40x24 plain text (Narrow, no colors)")
+        await self.session.writeline()
+
+        choice = await self.session.readline("Selection [1]: ")
+
+        configs = {
+            "1": (80, 24, True),   # Standard ANSI
+            "2": (80, 24, False),  # Standard Plain
+            "3": (40, 24, True),   # Narrow ANSI
+            "4": (40, 24, False),  # Narrow Plain
+        }
+
+        cols, rows, ansi = configs.get(choice, configs["1"])
+
+        self.session.capabilities.cols = cols
+        self.session.capabilities.rows = rows
+        self.session.capabilities.ansi = ansi
+        self.session.capabilities.color = ansi
+
+        # Update display mode
+        self.session.update_display_mode()
+
+        mode_descriptions = {
+            "1": "80x24 with ANSI colors",
+            "2": "80x24 plain text",
+            "3": "40x24 with ANSI colors",
+            "4": "40x24 plain text"
+        }
+
+        await self.session.writeline(f"\n{mode_descriptions.get(choice, mode_descriptions['1'])} selected")
 
     async def login(self) -> bool:
         for attempt in range(self.max_attempts):
@@ -108,17 +203,34 @@ class LoginUI:
                 self.session.username = user.username
                 self.session.access_level = user.access_level
 
+                # Ask if user wants to use saved preferences
+                await self.session.writeline()
+                if user.encoding_pref or (user.terminal_cols and user.terminal_rows):
+                    await self.session.writeline("Your saved preferences:")
+                    if user.encoding_pref:
+                        await self.session.writeline(f"  Encoding: {user.encoding_pref}")
+                    if user.terminal_cols and user.terminal_rows:
+                        await self.session.writeline(f"  Terminal: {user.terminal_cols}x{user.terminal_rows}")
+
+                    use_saved = await self.session.readline("\r\nUse saved preferences? (Y/N) [Y]: ")
+                    if use_saved.upper() != 'N':
+                        if user.encoding_pref:
+                            self.session.set_encoding(user.encoding_pref)
+                        if user.terminal_cols and user.terminal_rows:
+                            self.session.capabilities.cols = user.terminal_cols
+                            self.session.capabilities.rows = user.terminal_rows
+
                 await self.user_repo.update_last_login(user.id)
                 logger.info(f"User {username} logged in (Session: {self.session.id})")
                 return True
 
             else:
-                await self.session.writeline("\r\nInvalid username or password.")
+                await self.session.writeline(f"\r\n{self.session.t('login.invalid_credentials')}")
                 if attempt < self.max_attempts - 1:
                     await self.session.writeline(f"Attempts remaining: {self.max_attempts - attempt - 1}")
                 await asyncio.sleep(1)
 
-        await self.session.writeline("\r\nToo many failed attempts.")
+        await self.session.writeline(f"\r\n{self.session.t('login.max_attempts')}")
         return False
 
     async def register(self) -> bool:
@@ -163,6 +275,11 @@ class LoginUI:
         real_name = await self.session.readline("Real name (optional): ")
         location = await self.session.readline("Location (optional): ")
 
+        # Save terminal preferences
+        encoding_pref = self.session.capabilities.encoding
+        terminal_cols = self.session.capabilities.cols
+        terminal_rows = self.session.capabilities.rows
+
         password_hash = await self.auth_manager.hash_password(password)
 
         user = await self.user_repo.create(
@@ -173,23 +290,179 @@ class LoginUI:
             location=location or None,
         )
 
+        # Update user preferences after creation
+        if user:
+            await self.user_repo.update_terminal_settings(
+                user.id,
+                encoding_pref,
+                terminal_cols,
+                terminal_rows
+            )
+            # Also save language preference
+            from ..storage.db import get_session
+            from sqlalchemy import update
+            from ..storage.models import User as UserModel
+            async with get_session() as db_session:
+                await db_session.execute(
+                    update(UserModel)
+                    .where(UserModel.id == user.id)
+                    .values(language_pref=self.session.language)
+                )
+                await db_session.commit()
+
         if user:
             self.session.user_id = user.id
             self.session.username = user.username
             self.session.access_level = user.access_level
 
             await self.session.writeline()
-            await self.session.writeline(f"Registration successful! Welcome, {username}!")
+            await self.session.writeline(self.session.t('register.success', username=username))
             logger.info(f"New user registered: {username} (Session: {self.session.id})")
             return True
 
         else:
-            await self.session.writeline("\r\nRegistration failed. Please try again.")
+            await self.session.writeline(f"\r\n{self.session.t('register.failed')}")
             return False
 
     async def guest_login(self) -> bool:
         self.session.username = "Guest"
         self.session.access_level = 0
-        await self.session.writeline("\r\nLogged in as Guest (limited access)")
+        await self.session.writeline(f"\r\n{self.session.t('login.guest_login')}")
         logger.info(f"Guest login (Session: {self.session.id})")
         return True
+
+    async def show_motd(self) -> None:
+        """Display MOTD after charset, language, and terminal are configured"""
+        await self.session.clear_screen()
+
+        config = get_config()
+        motd_file = config.server.motd_asset
+
+        try:
+            motd_path = Path(__file__).parent.parent / "assets" / motd_file
+
+            if motd_path.exists():
+                with open(motd_path, "rb") as f:
+                    content = f.read()
+
+                # Display based on configured encoding
+                if self.session.capabilities.encoding == "cp437" or "437" in self.session.capabilities.encoding:
+                    await self.session.write(content)
+                else:
+                    await self.session.write(content.decode("utf-8", errors="replace"))
+            else:
+                await self.show_default_motd()
+        except Exception as e:
+            logger.warning(f"Could not load MOTD: {e}")
+            await self.show_default_motd()
+
+        await self.session.writeline()
+
+    async def show_motd_template(self) -> None:
+        """Show MOTD using the template system"""
+        # Get system stats for the template
+        from ..storage.repositories import SystemRepository
+        sys_repo = SystemRepository()
+        stats = await sys_repo.get_stats()
+
+        # Prepare context
+        context = {
+            'username': self.session.username or 'Guest',
+            'total_users': stats.get('total_users', 0),
+            'online_now': stats.get('active_sessions', 0),
+            'messages_today': stats.get('messages_today', 0),
+            'files_shared': stats.get('total_files', 0),
+            'last_login': self.session.last_activity.strftime("%Y-%m-%d %H:%M") if self.session.last_activity else "First Visit",
+            'access_level': self.session.access_level,
+            'unread_mail': 0,  # TODO: Get actual unread count
+            'system_news': await self._get_system_news(),
+            'is_birthday': False  # TODO: Check if it's user's birthday
+        }
+
+        # Render MOTD template
+        await self.session.render_template('motd', **context)
+
+        # Wait for user to press a key
+        await self.session.read(1)
+
+    async def _get_system_news(self) -> str:
+        """Get latest system news"""
+        # TODO: Implement actual news retrieval from database
+        return "Welcome to the new template-based BBS system!"
+
+    async def show_default_motd(self) -> None:
+        """Show default MOTD with proper charset support"""
+        if self.session.capabilities.ansi:
+            await self.session.set_color(fg=6, bold=True)
+
+            # Use appropriate box characters based on encoding
+            if self.session.capabilities.encoding in ["utf-8", "windows-1251"]:
+                # UTF-8 box drawing
+                await self.session.writeline("╔══════════════════════════════════════════════╗")
+                await self.session.writeline("║                                              ║")
+                await self.session.writeline("║         PERESTROIKA BBS SYSTEM               ║")
+                await self.session.writeline("║                                              ║")
+                await self.session.writeline("║         A Modern Retro Experience            ║")
+                await self.session.writeline("║                                              ║")
+                await self.session.writeline("╚══════════════════════════════════════════════╝")
+            elif "437" in self.session.capabilities.encoding or self.session.capabilities.encoding == "cp437":
+                # CP437 box drawing (using extended ASCII)
+                await self.session.write(b"\xc9" + b"\xcd" * 48 + b"\xbb\r\n")  # ╔═══╗
+                await self.session.write(b"\xba" + b" " * 48 + b"\xba\r\n")     # ║   ║
+                await self.session.write(b"\xba         PERESTROIKA BBS SYSTEM               \xba\r\n")
+                await self.session.write(b"\xba                                                \xba\r\n")
+                await self.session.write(b"\xba         A Modern Retro Experience              \xba\r\n")
+                await self.session.write(b"\xba" + b" " * 48 + b"\xba\r\n")
+                await self.session.write(b"\xc8" + b"\xcd" * 48 + b"\xbc\r\n")  # ╚═══╝
+            else:
+                # ASCII fallback
+                await self.session.writeline("+" + "=" * 48 + "+")
+                await self.session.writeline("|                                                |")
+                await self.session.writeline("|         PERESTROIKA BBS SYSTEM                |")
+                await self.session.writeline("|                                                |")
+                await self.session.writeline("|         A Modern Retro Experience              |")
+                await self.session.writeline("|                                                |")
+                await self.session.writeline("+" + "=" * 48 + "+")
+
+            await self.session.reset_color()
+        else:
+            # Plain text for non-ANSI terminals
+            await self.session.writeline("=" * 50)
+            await self.session.writeline("         PERESTROIKA BBS SYSTEM")
+            await self.session.writeline("         A Modern Retro Experience")
+            await self.session.writeline("=" * 50)
+
+        await self.session.writeline()
+        config = get_config()
+        await self.session.writeline(config.server.welcome_message if hasattr(config.server, 'welcome_message') else "Welcome!")
+
+    async def show_welcome(self) -> None:
+        """Show ASCII-only welcome screen before charset selection
+
+        This must use pure 7-bit ASCII that works on ANY terminal,
+        including ancient terminals that don't support extended ASCII.
+        """
+        # Load the welcome template directly as it's pure ASCII
+        from pathlib import Path
+        template_path = Path(__file__).parent.parent / "templates" / "templates" / "welcome.j2"
+
+        if template_path.exists():
+            with open(template_path, 'r', encoding='ascii', errors='ignore') as f:
+                content = f.read()
+            # Remove Jinja2 comments
+            lines = [line for line in content.split('\n') if not line.strip().startswith('{#')]
+            await self.session.write('\r\n'.join(lines))
+        else:
+            # Fallback if template not found
+            await self.session.writeline()
+            await self.session.writeline("    +-----------------------+")
+            await self.session.writeline("    |   PERESTROIKA BBS     |")
+            await self.session.writeline("    |   ===============     |")
+            await self.session.writeline("    |                       |")
+            await self.session.writeline("    |    Modern Retro       |")
+            await self.session.writeline("    |     Experience        |")
+            await self.session.writeline("    +-----------------------+")
+            await self.session.writeline()
+            await self.session.writeline("    Welcome to the system!")
+
+        await self.session.writeline()

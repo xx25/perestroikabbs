@@ -47,11 +47,13 @@ async def main_async() -> None:
     server = TelnetServer()
 
     loop = asyncio.get_event_loop()
+    shutdown_event = asyncio.Event()
 
     def signal_handler(sig, frame):
         logger.info(f"Received signal {sig}")
-        asyncio.create_task(shutdown(server))
-        sys.exit(0)
+        # Set event to trigger graceful shutdown in the main loop
+        # Don't call sys.exit() here - let the async shutdown complete first
+        shutdown_event.set()
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -59,7 +61,14 @@ async def main_async() -> None:
     try:
         logger.info("Starting Perestroika BBS...")
         logger.info(f"Telnet server: {config.server.host}:{config.server.port}")
-        await server.run()
+
+        # Start the server
+        await server.start()
+
+        # Wait for shutdown signal
+        await shutdown_event.wait()
+        logger.info("Shutdown signal received, cleaning up...")
+
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt")
     except Exception as e:

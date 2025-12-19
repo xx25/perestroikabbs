@@ -1,0 +1,28 @@
+{# Main Menu for 80x24 with ANSI #}
+{% extends "base/screen.j2" %}
+{% import "base/macros.j2" as macros %}
+
+{% block content %}
+{{ ansi.color(fg=6) }}
+╔════════════════════════════════════════════════════════════════════════════╗
+║{{ ansi.color(fg=3, bold=True) }}                             MAIN MENU                                     {{ ansi.color(fg=6) }}║
+╠════════════════════════════════════════════════════════════════════════════╣
+║                                                                            ║
+║  {{ ansi.color(fg=7) }}[{{ ansi.color(fg=2, bold=True) }}M{{ ansi.color(fg=7) }}] Message Boards              [{{ ansi.color(fg=2, bold=True) }}F{{ ansi.color(fg=7) }}] File Library                     {{ ansi.color(fg=6) }}║
+║  {{ ansi.color(fg=7) }}[{{ ansi.color(fg=2, bold=True) }}E{{ ansi.color(fg=7) }}] Private Email               [{{ ansi.color(fg=2, bold=True) }}T{{ ansi.color(fg=7) }}] File Transfer                    {{ ansi.color(fg=6) }}║
+║  {{ ansi.color(fg=7) }}[{{ ansi.color(fg=2, bold=True) }}C{{ ansi.color(fg=7) }}] Chat Rooms                  [{{ ansi.color(fg=2, bold=True) }}U{{ ansi.color(fg=7) }}] User List                       {{ ansi.color(fg=6) }}║
+║  {{ ansi.color(fg=7) }}[{{ ansi.color(fg=2, bold=True) }}N{{ ansi.color(fg=7) }}] News & Bulletins            [{{ ansi.color(fg=2, bold=True) }}S{{ ansi.color(fg=7) }}] System Statistics               {{ ansi.color(fg=6) }}║
+║  {{ ansi.color(fg=7) }}[{{ ansi.color(fg=2, bold=True) }}P{{ ansi.color(fg=7) }}] Personal Settings           [{{ ansi.color(fg=2, bold=True) }}H{{ ansi.color(fg=7) }}] Help & Information              {{ ansi.color(fg=6) }}║
+║                                                                            ║
+{% if access_level >= 10 %}
+║  {{ ansi.color(fg=7) }}[{{ ansi.color(fg=5, bold=True) }}A{{ ansi.color(fg=7) }}] Admin Menu                                                           {{ ansi.color(fg=6) }}║
+║                                                                            ║
+{% endif %}
+║  {{ ansi.color(fg=7) }}[{{ ansi.color(fg=1, bold=True) }}G{{ ansi.color(fg=7) }}] Goodbye (Logoff)                                                    {{ ansi.color(fg=6) }}║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+{{ ansi.reset() }}
+
+{{ ansi.color(fg=3) }}{{ macros.status_line(username, access_level, session_time|default("00:00"), 80) }}{{ ansi.reset() }}
+
+{{ ansi.color(fg=7, bold=True) }}Your choice: {{ ansi.reset() }}

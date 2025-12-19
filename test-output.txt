@@ -1,0 +1,23 @@
+=====================================
+PERESTROIKA BBS TELNET TESTING
+=====================================
+Target: localhost:2323
+
+Test 1: Basic Connection ... [0;32m✓ PASSED[0m
+Test 2: Data Exchange ... [0;32m✓ PASSED[0m
+Test 3: ANSI Support ... [0;32m✓ PASSED[0m
+Test 4: Multiple Input Lines ... [0;32m✓ PASSED[0m
+Test 5: Long Input Handling ... [0;32m✓ PASSED[0m
+Test 6: UTF-8 Support ... [0;32m✓ PASSED[0m
+Test 7: Rapid Connections ... [0;32m✓ PASSED[0m
+Test 8: Telnet Protocol ... ./tests/simple_test.sh: line 133: warning: command substitution: ignored null byte in input
+[0;32m✓ PASSED[0m
+
+=====================================
+TEST SUMMARY
+=====================================
+[0;32mPassed: 8[0m
+[0;31mFailed: 0[0m
+Success Rate: 100%
+=====================================
+[0;32mAll tests passed![0m

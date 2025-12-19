@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: perestroika-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: perestroika_bbs
+      MYSQL_USER: bbs_user
+      MYSQL_PASSWORD: bbspassword
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 5
+    networks:
+      - bbs_network
+
+  bbs:
+    build: .
+    container_name: perestroika-bbs
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "2323:2323"
+    environment:
+      - BBS_DB_HOST=mysql
+      - BBS_DB_PORT=3306
+      - BBS_DB_USER=bbs_user
+      - BBS_DB_PASSWORD=bbspassword
+      - BBS_DB_NAME=perestroika_bbs
+    volumes:
+      - ./config.toml:/app/config.toml
+      - bbs_files:/var/lib/bbs/files
+      - bbs_uploads:/var/lib/bbs/uploads
+      - bbs_logs:/var/log/bbs
+      - ./bbs/app/assets:/app/bbs/app/assets
+    networks:
+      - bbs_network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  bbs_files:
+  bbs_uploads:
+  bbs_logs:
+
+networks:
+  bbs_network:
+    driver: bridge

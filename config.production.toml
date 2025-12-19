@@ -1,0 +1,54 @@
+# Production configuration for Perestroika BBS
+# Deploy on 192.168.91.2 with existing MySQL
+
+[server]
+host = "0.0.0.0"  # Listen on all interfaces
+port = 2323
+name = "Perestroika BBS"
+welcome_message = "Welcome to Perestroika BBS!"
+max_connections = 100
+idle_timeout = 1800  # 30 minutes
+motd_asset = "motd.ans"
+
+[database]
+# Connect to MySQL on host machine
+host = "host.docker.internal"  # This resolves to the Docker host
+port = 3306
+user = "bbs"
+password = "CHANGE_THIS_PASSWORD"  # Set your MySQL password here
+database = "perestroika_bbs"
+pool_size = 10
+max_overflow = 20
+
+[storage]
+# File storage paths (inside container)
+files_dir = "/var/lib/bbs/files"
+uploads_dir = "/var/lib/bbs/uploads"
+temp_dir = "/tmp/bbs"
+
+[logging]
+level = "INFO"
+file = "/var/log/bbs/bbs.log"
+max_size = "10MB"
+max_backups = 5
+
+[security]
+max_login_attempts = 3
+session_timeout = 3600
+require_secure_passwords = true
+min_password_length = 8
+
+[features]
+enable_chat = true
+enable_file_transfer = true
+enable_email = true
+enable_forums = true
+enable_games = false
+enable_door_games = false
+
+[telnet]
+binary_mode = true
+echo_mode = true
+suppress_go_ahead = true
+naws = true
+terminal_type = true

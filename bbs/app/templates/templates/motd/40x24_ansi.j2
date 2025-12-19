@@ -1,0 +1,37 @@
+{# MOTD for 40x24 with ANSI - Completely different layout for narrow screens #}
+{% extends "base/screen.j2" %}
+{% import "base/macros.j2" as macros %}
+
+{% block content %}
+{{ ansi.color(fg=6, bold=True) }}
+╔══════════════════════════════════════╗
+║       PERESTROIKA BBS SYSTEM        ║
+╚══════════════════════════════════════╝
+{{ ansi.reset() }}
+
+{{ ansi.color(fg=3, bold=True) }}Welcome back!{{ ansi.reset() }}
+{{ ansi.color(fg=3) }}{{ username }}{{ ansi.reset() }}
+
+{{ ansi.color(fg=7) }}═══ System Status ═══{{ ansi.reset() }}
+{{ ansi.color(fg=2) }}Users Online:{{ ansi.reset() }} {{ online_now|default(0) }}
+{{ ansi.color(fg=2) }}Total Users:{{ ansi.reset() }}  {{ total_users|default(0) }}
+{{ ansi.color(fg=2) }}Messages:{{ ansi.reset() }}     {{ messages_today|default(0) }}
+{{ ansi.color(fg=2) }}Files:{{ ansi.reset() }}        {{ files_shared|default(0) }}
+
+{{ ansi.color(fg=6) }}═══ Your Account ═══{{ ansi.reset() }}
+Last Visit:
+  {{ last_login|default("First Visit")|wordwrap(36)|indent(2) }}
+Level: {{ access_level|default(1) }}
+Mail: {{ ansi.color(fg=1, bold=True) if unread_mail }}{{ unread_mail|default(0) }} new{{ ansi.reset() }}
+
+{% if system_news %}
+{{ ansi.color(fg=5) }}═══ NEWS ═══{{ ansi.reset() }}
+{{ system_news|wordwrap(38) }}
+{% endif %}
+
+{% if is_birthday %}
+{{ ansi.color(fg=3, blink=True) }}★ HAPPY BIRTHDAY! ★{{ ansi.reset() }}
+{% endif %}
+
+{{ ansi.color(fg=7) }}{{ macros.press_any_key(40) }}{{ ansi.reset() }}
+{% endblock %}

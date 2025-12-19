@@ -1,0 +1,15 @@
+FROM python:3.11-slim
+
+# Install testing dependencies
+RUN pip install --no-cache-dir pexpect pytest pytest-asyncio pytest-timeout
+
+# Install netcat for basic connectivity tests
+RUN apt-get update && apt-get install -y netcat-openbsd && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /tests
+
+# Copy test files
+COPY tests/ /tests/
+COPY bbs/app/utils/config.py /bbs/app/utils/config.py
+
+CMD ["python", "-m", "pytest", "-v", "--tb=short"]

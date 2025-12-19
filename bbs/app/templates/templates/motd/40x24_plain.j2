@@ -1,0 +1,35 @@
+{# MOTD for 40x24 without ANSI - Plain text narrow layout #}
+{% extends "base/screen.j2" %}
+{% import "base/macros.j2" as macros %}
+
+{% block content %}
++--------------------------------------+
+|      PERESTROIKA BBS SYSTEM         |
++--------------------------------------+
+
+Welcome back!
+{{ username }}
+
+=== System Status ===
+Users Online: {{ online_now|default(0) }}
+Total Users:  {{ total_users|default(0) }}
+Messages:     {{ messages_today|default(0) }}
+Files:        {{ files_shared|default(0) }}
+
+=== Your Account ===
+Last Visit:
+  {{ last_login|default("First Visit")|wordwrap(36)|indent(2) }}
+Level: {{ access_level|default(1) }}
+Mail: {{ unread_mail|default(0) }} new
+
+{% if system_news %}
+--- NEWS ---
+{{ system_news|wordwrap(38) }}
+{% endif %}
+
+{% if is_birthday %}
+*** HAPPY BIRTHDAY! ***
+{% endif %}
+
+{{ macros.press_any_key(40) }}
+{% endblock %}

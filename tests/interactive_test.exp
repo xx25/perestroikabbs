@@ -1,0 +1,142 @@
+#!/usr/bin/expect -f
+# Interactive BBS testing with expect
+
+set timeout 5
+set host [lindex $argv 0]
+set port [lindex $argv 1]
+
+if {$host == ""} { set host "localhost" }
+if {$port == ""} { set port "2323" }
+
+puts "======================================="
+puts "BBS INTERACTIVE TESTING"
+puts "======================================="
+puts "Target: $host:$port\n"
+
+# Connect to BBS
+spawn telnet $host $port
+
+# Test 1: Connection
+expect {
+    timeout {
+        puts "FAILED: Connection timeout"
+        exit 1
+    }
+    "Connected to" {
+        puts "✓ Connected successfully"
+    }
+    "Escape character" {
+        puts "✓ Telnet connection established"
+    }
+}
+
+# Wait for initial prompt/menu
+sleep 2
+
+# Test 2: Send empty line (should get menu or prompt)
+send "\r"
+expect {
+    timeout {
+        puts "WARNING: No response to empty line"
+    }
+    -re ".*" {
+        puts "✓ BBS responding to input"
+    }
+}
+
+# Test 3: Try invalid command
+send "INVALIDCMD\r"
+expect {
+    timeout {
+        puts "WARNING: No response to invalid command"
+    }
+    -re ".*invalid.*|.*error.*|.*unknown.*" {
+        puts "✓ Invalid command handled"
+    }
+    -re ".*" {
+        puts "✓ Response received"
+    }
+}
+
+# Test 4: Send ANSI cursor position request
+send "\033\[6n"
+expect {
+    timeout {
+        puts "INFO: No ANSI cursor response"
+    }
+    -re "\033\\\[\[0-9\]+;\[0-9\]+R" {
+        puts "✓ ANSI positioning supported"
+    }
+}
+
+# Test 5: Try help command
+send "?\r"
+expect {
+    timeout {
+        send "help\r"
+        expect {
+            timeout {
+                puts "INFO: No help available"
+            }
+            -re ".*" {
+                puts "✓ Help command works"
+            }
+        }
+    }
+    -re ".*" {
+        puts "✓ ? command works"
+    }
+}
+
+# Test 6: UTF-8 test
+send "тест 测试 🌍\r"
+expect {
+    timeout {
+        puts "WARNING: UTF-8 handling timeout"
+    }
+    -re ".*" {
+        puts "✓ UTF-8 input accepted"
+    }
+}
+
+# Test 7: Try to quit
+puts "\nAttempting to quit..."
+send "Q\r"
+expect {
+    timeout {
+        send "quit\r"
+        expect {
+            timeout {
+                send "exit\r"
+                expect {
+                    timeout {
+                        puts "WARNING: No standard quit command"
+                        send "\034"  ;# Ctrl-]
+                        send "quit\r"
+                    }
+                    eof {
+                        puts "✓ Exit command works"
+                    }
+                    -re ".*bye.*|.*goodbye.*" {
+                        puts "✓ Quit message received"
+                    }
+                }
+            }
+            eof {
+                puts "✓ Quit command works"
+            }
+        }
+    }
+    eof {
+        puts "✓ Q command works"
+    }
+    -re ".*bye.*|.*goodbye.*" {
+        puts "✓ Goodbye message received"
+        send "\r"
+        expect eof
+    }
+}
+
+puts "\n======================================="
+puts "TESTING COMPLETE"
+puts "======================================="

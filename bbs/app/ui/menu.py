@@ -110,23 +110,23 @@ class Menu:
 
 class MainMenu(Menu):
     def __init__(self, session: Session):
-        super().__init__(session, "Main Menu")
+        super().__init__(session, session.t('menu.main_title'))
         self.setup_menu()
 
     def setup_menu(self) -> None:
-        self.add_item("M", "Message Boards", self.message_boards)
-        self.add_item("E", "Private Mail", self.private_mail)
-        self.add_item("C", "Chat Rooms", self.chat_rooms)
-        self.add_item("F", "File Library", self.file_library)
-        self.add_item("U", "User List", self.user_list)
+        self.add_item("M", self.session.t('menu.boards'), self.message_boards)
+        self.add_item("E", self.session.t('menu.mail'), self.private_mail)
+        self.add_item("C", self.session.t('menu.chat'), self.chat_rooms)
+        self.add_item("F", self.session.t('menu.files'), self.file_library)
+        self.add_item("U", self.session.t('menu.users'), self.user_list)
         self.add_item("S", "System Stats", self.system_stats)
-        self.add_item("P", "Personal Settings", self.personal_settings)
+        self.add_item("P", self.session.t('menu.settings'), self.personal_settings)
 
         if self.session.access_level >= 10:
-            self.add_item("A", "Admin Menu", self.admin_menu, min_access=10)
+            self.add_item("A", self.session.t('menu.admin'), self.admin_menu, min_access=10)
 
-        self.add_item("?", "Help", self.show_help)
-        self.add_item("Q", "Quit", self.quit)
+        self.add_item("?", self.session.t('menu.help'), self.show_help)
+        self.add_item("Q", self.session.t('menu.quit'), self.quit)
 
     async def message_boards(self) -> None:
         from .boards import BoardsUI
@@ -195,12 +195,13 @@ class MainMenu(Menu):
         await self.session.read(1)
 
     async def personal_settings(self) -> None:
-        settings_menu = Menu(self.session, "Personal Settings")
-        settings_menu.add_item("1", "Change Password", self.change_password)
-        settings_menu.add_item("2", "Change Email", self.change_email)
-        settings_menu.add_item("3", "Terminal Settings", self.terminal_settings)
-        settings_menu.add_item("4", "View Profile", self.view_profile)
-        settings_menu.add_item("Q", "Back to Main Menu", lambda: setattr(settings_menu, "running", False))
+        settings_menu = Menu(self.session, self.session.t('settings.title'))
+        settings_menu.add_item("1", self.session.t('settings.change_password'), self.change_password)
+        settings_menu.add_item("2", self.session.t('settings.change_email'), self.change_email)
+        settings_menu.add_item("3", self.session.t('settings.terminal_settings'), self.terminal_settings)
+        settings_menu.add_item("4", self.session.t('settings.language_settings'), self.language_settings)
+        settings_menu.add_item("5", self.session.t('settings.view_profile'), self.view_profile)
+        settings_menu.add_item("Q", self.session.t('common.back'), lambda: setattr(settings_menu, "running", False))
 
         await settings_menu.run()
 
@@ -249,7 +250,165 @@ class MainMenu(Menu):
         await self.session.writeline(f"RIPscrip support: {'Yes' if self.session.capabilities.ripscrip else 'No'}")
 
         await self.session.writeline()
-        await self.session.writeline("Press any key to continue...")
+        await self.session.writeline("Options:")
+        await self.session.writeline("1. Change terminal size")
+        await self.session.writeline("2. Change encoding")
+        await self.session.writeline("3. Toggle ANSI colors")
+        await self.session.writeline("4. Save current settings as default")
+        await self.session.writeline("0. Back")
+
+        choice = await self.session.readline("\r\nChoice: ")
+
+        if choice == "1":
+            await self._change_terminal_size()
+        elif choice == "2":
+            await self._change_encoding()
+        elif choice == "3":
+            await self._toggle_ansi()
+        elif choice == "4":
+            await self._save_terminal_defaults()
+
+        # Show settings again if something was changed
+        if choice in ["1", "2", "3", "4"]:
+            await self.terminal_settings()  # Recursive call to show updated settings
+
+    async def _change_terminal_size(self) -> None:
+        """Change terminal size settings"""
+        await self.session.writeline()
+        await self.session.writeline("Select terminal size:")
+        await self.session.writeline("1. 80x24  (Standard)")
+        await self.session.writeline("2. 80x25  (DOS/PC)")
+        await self.session.writeline("3. 80x43  (EGA)")
+        await self.session.writeline("4. 80x50  (VGA)")
+        await self.session.writeline("5. 132x24 (VT100 wide)")
+        await self.session.writeline("6. Custom")
+        await self.session.writeline("0. Cancel")
+
+        choice = await self.session.readline("\r\nChoice: ")
+
+        size_map = {
+            "1": (80, 24),
+            "2": (80, 25),
+            "3": (80, 43),
+            "4": (80, 50),
+            "5": (132, 24)
+        }
+
+        if choice in size_map:
+            cols, rows = size_map[choice]
+            self.session.capabilities.cols = cols
+            self.session.capabilities.rows = rows
+            await self.session.writeline(f"\r\nTerminal size changed to {cols}x{rows}")
+        elif choice == "6":
+            cols_str = await self.session.readline("\r\nColumns (40-255): ")
+            rows_str = await self.session.readline("Rows (20-100): ")
+            try:
+                cols = int(cols_str)
+                rows = int(rows_str)
+                if 40 <= cols <= 255 and 20 <= rows <= 100:
+                    self.session.capabilities.cols = cols
+                    self.session.capabilities.rows = rows
+                    await self.session.writeline(f"\r\nTerminal size changed to {cols}x{rows}")
+                else:
+                    await self.session.writeline("\r\nInvalid size range")
+            except ValueError:
+                await self.session.writeline("\r\nInvalid input")
+
+    async def _change_encoding(self) -> None:
+        """Change character encoding"""
+        await self.session.writeline()
+        await self.session.writeline("Select encoding:")
+        await self.session.writeline("1. UTF-8 (Unicode)")
+        await self.session.writeline("2. CP437 (DOS/ANSI art)")
+        await self.session.writeline("3. ISO-8859-1 (Latin-1)")
+        await self.session.writeline("4. Windows-1252")
+        await self.session.writeline("5. KOI8-R (Russian)")
+        await self.session.writeline("6. ASCII (7-bit)")
+        await self.session.writeline("0. Cancel")
+
+        choice = await self.session.readline("\r\nChoice: ")
+
+        encoding_map = {
+            "1": "utf-8",
+            "2": "cp437",
+            "3": "iso-8859-1",
+            "4": "windows-1252",
+            "5": "koi8-r",
+            "6": "ascii"
+        }
+
+        if choice in encoding_map:
+            encoding = encoding_map[choice]
+            self.session.set_encoding(encoding)
+            if encoding == "ascii":
+                self.session.capabilities.seven_bit = True
+            else:
+                self.session.capabilities.seven_bit = False
+            await self.session.writeline(f"\r\nEncoding changed to {encoding}")
+
+    async def _toggle_ansi(self) -> None:
+        """Toggle ANSI color support"""
+        self.session.capabilities.ansi = not self.session.capabilities.ansi
+        self.session.capabilities.color = self.session.capabilities.ansi
+        status = "enabled" if self.session.capabilities.ansi else "disabled"
+        await self.session.writeline(f"\r\nANSI colors {status}")
+
+    async def _save_terminal_defaults(self) -> None:
+        """Save current terminal settings as user defaults"""
+        if not self.session.user_id:
+            await self.session.writeline("\r\nYou must be logged in to save preferences.")
+            return
+
+        from ..storage.repositories import UserRepository
+        user_repo = UserRepository()
+
+        await user_repo.update_terminal_settings(
+            self.session.user_id,
+            self.session.capabilities.encoding,
+            self.session.capabilities.cols,
+            self.session.capabilities.rows
+        )
+
+        await self.session.writeline("\r\nTerminal settings saved as defaults.")
+        await self.session.writeline("These will be applied on your next login.")
+
+    async def language_settings(self) -> None:
+        """Allow user to change interface language"""
+        await self.session.clear_screen()
+        await self.session.writeline(self.session.t('settings.language_settings'))
+        await self.session.writeline()
+
+        current_lang = 'English' if self.session.language == 'en' else 'Русский'
+        await self.session.writeline(self.session.t('settings.current_language', language=current_lang))
+        await self.session.writeline()
+
+        await self.session.writeline("1. English")
+        await self.session.writeline("2. Русский (Russian)")
+        await self.session.writeline(f"0. {self.session.t('common.back')}")
+
+        choice = await self.session.readline(f"\r\n{self.session.t('login.your_choice')}: ")
+
+        if choice == "1":
+            self.session.set_language('en')
+            await self.session.writeline("\r\nLanguage changed to English")
+        elif choice == "2":
+            self.session.set_language('ru')
+            await self.session.writeline("\r\nЯзык изменен на русский")
+
+        # Save preference if logged in
+        if choice in ["1", "2"] and self.session.user_id:
+            from ..storage.db import get_session
+            from sqlalchemy import update
+            from ..storage.models import User
+            async with get_session() as db_session:
+                await db_session.execute(
+                    update(User)
+                    .where(User.id == self.session.user_id)
+                    .values(language_pref=self.session.language)
+                )
+                await db_session.commit()
+            await self.session.writeline(self.session.t('settings.settings_saved'))
+
         await self.session.read(1)
 
     async def view_profile(self) -> None:
@@ -272,29 +431,29 @@ class MainMenu(Menu):
 
     async def show_help(self) -> None:
         await self.session.clear_screen()
-        await self.session.writeline("=== Help ===")
+        await self.session.writeline(self.session.t('help.title'))
         await self.session.writeline()
-        await self.session.writeline("Navigation:")
-        await self.session.writeline("  - Use the letter/number keys to select menu options")
-        await self.session.writeline("  - Press ENTER after making your selection")
+        await self.session.writeline(self.session.t('help.navigation'))
+        await self.session.writeline(f"  - {self.session.t('help.nav_text')}")
+        await self.session.writeline(f"  - {self.session.t('help.nav_enter')}")
         await self.session.writeline()
-        await self.session.writeline("Features:")
-        await self.session.writeline("  - Message Boards: Read and post public messages")
-        await self.session.writeline("  - Private Mail: Send and receive private messages")
-        await self.session.writeline("  - Chat Rooms: Real-time chat with other users")
-        await self.session.writeline("  - File Library: Browse and download files")
+        await self.session.writeline(self.session.t('help.features'))
+        await self.session.writeline(f"  - {self.session.t('help.feat_boards')}")
+        await self.session.writeline(f"  - {self.session.t('help.feat_mail')}")
+        await self.session.writeline(f"  - {self.session.t('help.feat_chat')}")
+        await self.session.writeline(f"  - {self.session.t('help.feat_files')}")
         await self.session.writeline()
-        await self.session.writeline("Terminal Commands:")
-        await self.session.writeline("  - Ctrl-C: Interrupt current operation")
-        await self.session.writeline("  - Ctrl-S/Ctrl-Q: Pause/resume output")
+        await self.session.writeline(self.session.t('help.commands'))
+        await self.session.writeline(f"  - {self.session.t('help.cmd_interrupt')}")
+        await self.session.writeline(f"  - {self.session.t('help.cmd_pause')}")
 
         await self.session.writeline()
-        await self.session.writeline("Press any key to continue...")
+        await self.session.writeline(self.session.t('common.continue'))
         await self.session.read(1)
 
     async def quit(self) -> None:
         await self.session.writeline()
-        await self.session.writeline("Thank you for visiting Perestroika BBS!")
-        await self.session.writeline("Goodbye!")
+        await self.session.writeline(self.session.t('common.thank_you'))
+        await self.session.writeline(self.session.t('common.goodbye'))
         await asyncio.sleep(1)
         self.running = False

@@ -33,6 +33,7 @@ class User(Base):
     encoding_pref = Column(String(32), default="utf-8")
     terminal_cols = Column(Integer, default=80)
     terminal_rows = Column(Integer, default=24)
+    language_pref = Column(String(5), default="en")
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     last_login_at = Column(DateTime, nullable=True)
     login_count = Column(Integer, default=0)
@@ -45,7 +46,7 @@ class User(Base):
     messages = relationship("PrivateMessage", foreign_keys="PrivateMessage.sender_id", back_populates="sender")
     received_messages = relationship("PrivateMessage", foreign_keys="PrivateMessage.recipient_id", back_populates="recipient")
     uploads = relationship("File", back_populates="uploader")
-    chat_messages = relationship("ChatMessage", back_populates="author")
+    # chat_messages relationship handled by ChatMessage model to avoid ambiguity
 
     __table_args__ = (
         Index("idx_user_status_login", "status", "last_login_at"),
@@ -159,7 +160,7 @@ class ChatMessage(Base):
     whisper_to_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     room = relationship("ChatRoom", back_populates="messages")
-    author = relationship("User", foreign_keys=[author_id], back_populates="chat_messages")
+    author = relationship("User", foreign_keys=[author_id])
     whisper_to = relationship("User", foreign_keys=[whisper_to_id])
 
     __table_args__ = (

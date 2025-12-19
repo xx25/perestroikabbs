@@ -1,0 +1,26 @@
+{# Main Menu for 80x24 without ANSI #}
+{% extends "base/screen.j2" %}
+{% import "base/macros.j2" as macros %}
+
+{% block content %}
++============================================================================+
+|                             MAIN MENU                                     |
++============================================================================+
+|                                                                            |
+|  [M] Message Boards              [F] File Library                         |
+|  [E] Private Email               [T] File Transfer                        |
+|  [C] Chat Rooms                  [U] User List                           |
+|  [N] News & Bulletins            [S] System Statistics                   |
+|  [P] Personal Settings           [H] Help & Information                  |
+|                                                                            |
+{% if access_level >= 10 %}
+|  [A] Admin Menu                                                           |
+|                                                                            |
+{% endif %}
+|  [G] Goodbye (Logoff)                                                    |
+|                                                                            |
++============================================================================+
+
+{{ macros.status_line(username, access_level, session_time|default("00:00"), 80) }}
+
+Your choice:

@@ -1,0 +1,25 @@
+{# Main Menu for 40x24 without ANSI - Plain text narrow layout #}
+{% extends "base/screen.j2" %}
+{% import "base/macros.j2" as macros %}
+
+{% block content %}
++--------------------------------------+
+|           MAIN MENU                  |
++--------------------------------------+
+
+[M] Messages     [F] Files
+[E] Email        [T] Transfer
+[C] Chat         [U] Users
+[N] News         [S] Stats
+[P] Settings     [H] Help
+{% if access_level >= 10 %}
+
+[A] Admin Menu
+{% endif %}
+
+[G] Goodbye
+
+========================================
+{{ macros.status_line(username, access_level, session_time|default("00:00"), 40) }}
+
+Choice:

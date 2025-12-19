@@ -1,0 +1,28 @@
+{# Main Menu for 40x24 with ANSI - Vertical layout for narrow screen #}
+{% extends "base/screen.j2" %}
+{% import "base/macros.j2" as macros %}
+
+{% block content %}
+{{ ansi.color(fg=6, bold=True) }}
+╔══════════════════════════════════════╗
+║           MAIN MENU                  ║
+╚══════════════════════════════════════╝
+{{ ansi.reset() }}
+
+{{ ansi.color(fg=7) }}[{{ ansi.color(fg=2, bold=True) }}M{{ ansi.color(fg=7) }}] Messages     [{{ ansi.color(fg=2, bold=True) }}F{{ ansi.color(fg=7) }}] Files
+[{{ ansi.color(fg=2, bold=True) }}E{{ ansi.color(fg=7) }}] Email        [{{ ansi.color(fg=2, bold=True) }}T{{ ansi.color(fg=7) }}] Transfer
+[{{ ansi.color(fg=2, bold=True) }}C{{ ansi.color(fg=7) }}] Chat         [{{ ansi.color(fg=2, bold=True) }}U{{ ansi.color(fg=7) }}] Users
+[{{ ansi.color(fg=2, bold=True) }}N{{ ansi.color(fg=7) }}] News         [{{ ansi.color(fg=2, bold=True) }}S{{ ansi.color(fg=7) }}] Stats
+[{{ ansi.color(fg=2, bold=True) }}P{{ ansi.color(fg=7) }}] Settings     [{{ ansi.color(fg=2, bold=True) }}H{{ ansi.color(fg=7) }}] Help
+{% if access_level >= 10 %}
+
+[{{ ansi.color(fg=5, bold=True) }}A{{ ansi.color(fg=7) }}] Admin Menu
+{% endif %}
+
+[{{ ansi.color(fg=1, bold=True) }}G{{ ansi.color(fg=7) }}] Goodbye
+{{ ansi.reset() }}
+
+{{ ansi.color(fg=6) }}════════════════════════════════════════{{ ansi.reset() }}
+{{ ansi.color(fg=3) }}{{ macros.status_line(username, access_level, session_time|default("00:00"), 40) }}{{ ansi.reset() }}
+
+{{ ansi.color(fg=7, bold=True) }}Choice: {{ ansi.reset() }}
