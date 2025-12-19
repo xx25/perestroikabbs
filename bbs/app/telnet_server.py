@@ -118,9 +118,9 @@ class TelnetServer:
             shell=self.shell,
             connect_maxwait=3.0,
             timeout=self.config.server.connection_timeout,
-            encoding='utf-8',  # Use UTF-8 for proper Unicode support
-            encoding_errors='replace',  # Replace errors instead of failing
-            force_binary=True,  # Force binary mode for UTF-8 to work properly
+            encoding='latin-1',  # Byte-transparent transport layer
+            encoding_errors='replace',
+            force_binary=True,
         )
 
         self._running = True

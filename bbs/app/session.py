@@ -76,15 +76,6 @@ class Session:
 
     def __post_init__(self):
         if self.writer:
-            # Force UTF-8 encoding on the telnetlib3 writer
-            # The writer uses these attributes for encoding
-            if hasattr(self.writer, 'encoding'):
-                self.writer.encoding = 'utf-8'
-
-            # Also check for the connection's encoding attribute
-            if hasattr(self.writer, 'connection') and hasattr(self.writer.connection, 'encoding'):
-                self.writer.connection.encoding = 'utf-8'
-
             peer = self.writer.transport.get_extra_info("peername")
             if peer:
                 self.remote_addr = peer[0]
@@ -105,18 +96,8 @@ class Session:
         self.writer.iac(WILL, ECHO)
         self.writer.iac(DO, NAWS)
         self.writer.iac(DO, TTYPE)
-        # Ensure the writer uses UTF-8 once binary mode is agreed
-        try:
-            if hasattr(self.writer, 'encoding'):
-                self.writer.encoding = 'utf-8'
-            if hasattr(self.writer, 'connection') and hasattr(self.writer.connection, 'encoding'):
-                self.writer.connection.encoding = 'utf-8'
-        except Exception:
-            pass
 
-        # Wait briefly for BINARY negotiation to complete before sending any
-        # non-ASCII. telnetlib3 will encode as US-ASCII with replacement until
-        # outbinary is True, which turns UTF-8 into question marks.
+        # Wait briefly for BINARY negotiation to complete
         outbinary = getattr(self.writer, 'outbinary', False)
         inbinary = getattr(self.writer, 'inbinary', False)
         waited = 0.0
@@ -151,7 +132,7 @@ class Session:
 
         try:
             data = await asyncio.wait_for(self.reader.read(100), timeout=0.5)
-            # telnetlib3 returns strings, not bytes
+            # telnetlib3 returns latin-1 strings; ASCII keywords preserved
             if "RIPTERM" in data or "RIPSCRIP" in data:
                 self.capabilities.ripscrip = True
                 logger.info(f"Session {self.id}: RIPscrip detected")
@@ -159,23 +140,40 @@ class Session:
             pass
 
     async def write(self, data: bytes | str) -> None:
-        # Convert to string if bytes (for telnetlib3 compatibility)
-        if isinstance(data, bytes):
-            data = data.decode(self.capabilities.encoding, errors='replace')
+        """Write text data with proper encoding.
 
-        # telnetlib3's writer expects strings and handles encoding internally
-        if self.writer:
-            # Handle XON/XOFF flow control
-            if self.capabilities.xon_xoff:
-                # For flow control, we need to work with bytes
-                encoded_data = data.encode(self.capabilities.encoding, errors='replace')
-                # Apply 7-bit mask if needed
-                if self.capabilities.seven_bit:
-                    encoded_data = bytes(b & 0x7F for b in encoded_data)
-                await self._write_with_flow_control(encoded_data)
+        For text output only. Binary transfers must use write_raw().
+
+        Args:
+            data: String to write (will be encoded with session encoding),
+                  or bytes already encoded in session encoding.
+        """
+        if not self.writer:
+            return
+
+        if self.transport_type == SessionTransport.SSH:
+            # SSH: writer handles UTF-8 encoding, pass strings directly
+            if isinstance(data, bytes):
+                data = data.decode(self.capabilities.encoding, errors='replace')
+            self.writer.write(data)
+            await self.writer.drain()
+        else:
+            # Telnet: use latin-1 byte-transparent transport
+            if isinstance(data, str):
+                data_bytes = data.encode(self.capabilities.encoding, errors='replace')
             else:
-                # telnetlib3's write method expects a string
-                self.writer.write(data)
+                data_bytes = data
+
+            # Apply 7-bit mask if needed
+            if self.capabilities.seven_bit:
+                data_bytes = bytes(b & 0x7F for b in data_bytes)
+
+            if self.capabilities.xon_xoff:
+                await self._write_with_flow_control(data_bytes)
+            else:
+                # Convert to latin-1 string for telnetlib3
+                transport_str = data_bytes.decode('latin-1')
+                self.writer.write(transport_str)
                 await self.writer.drain()
 
         self.last_activity = datetime.now()
@@ -190,25 +188,28 @@ class Session:
 
         for i in range(0, len(data), chunk_size):
             chunk = data[i:i + chunk_size]
-            # telnetlib3's writer expects strings
-            chunk_str = chunk.decode(self.capabilities.encoding, errors='replace')
+            # Use latin-1 for byte-transparent transport
+            chunk_str = chunk.decode('latin-1')
             self.writer.write(chunk_str)
             await self.writer.drain()
 
-            # Check for XOFF
+            # Check for XOFF (read raw byte via latin-1 transport)
             try:
                 control = await asyncio.wait_for(self.reader.read(1), timeout=0.01)
-                if control and control[0] == XOFF:
-                    paused = True
-                    logger.debug(f"Session {self.id}: XOFF received, pausing output")
+                if control:
+                    # Convert latin-1 char back to byte value
+                    control_byte = ord(control)
+                    if control_byte == XOFF:
+                        paused = True
+                        logger.debug(f"Session {self.id}: XOFF received, pausing output")
 
-                    # Wait for XON
-                    while paused:
-                        resume = await self.reader.read(1)
-                        if resume and resume[0] == XON:
-                            paused = False
-                            logger.debug(f"Session {self.id}: XON received, resuming output")
-                            break
+                        # Wait for XON
+                        while paused:
+                            resume = await self.reader.read(1)
+                            if resume and ord(resume) == XON:
+                                paused = False
+                                logger.debug(f"Session {self.id}: XON received, resuming output")
+                                break
             except asyncio.TimeoutError:
                 pass
 
@@ -219,11 +220,19 @@ class Session:
         if not self.reader:
             return ""
 
-        # telnetlib3 returns Unicode strings when encoding is set on the server.
-        # Avoid manual decoding here; rely on telnetlib3's codec.
-        data = await self.reader.read(size)
+        raw = await self.reader.read(size)
+        if not raw:
+            return ""
+
         self.last_activity = datetime.now()
-        return data or ""
+
+        if self.transport_type == SessionTransport.SSH:
+            # SSH: reader already returns Unicode (UTF-8 decoded)
+            return raw
+        else:
+            # Telnet: latin-1 transport, re-encode to bytes then decode with session encoding
+            raw_bytes = raw.encode('latin-1', errors='replace')
+            return raw_bytes.decode(self.capabilities.encoding, errors='replace')
 
     async def write_raw(self, data: bytes) -> None:
         """Write raw bytes directly to the transport (for binary file transfers).
@@ -254,16 +263,11 @@ class Session:
     async def read_raw(self, size: int, timeout: float = 10.0) -> Optional[bytes]:
         """Read raw bytes for binary file transfers.
 
-        IMPORTANT LIMITATION: telnetlib3 with encoding='utf-8' decodes incoming
-        data using UTF-8 with replacement. Binary data containing invalid UTF-8
-        sequences will be corrupted (replaced with U+FFFD).
+        Uses the latin-1 transport layer which is byte-transparent, so all
+        byte values 0x00-0xFF are preserved without corruption.
 
-        For reliable binary transfers over telnet:
-        - ZMODEM and Kermit use external binaries via PTY which bypasses this issue
-        - XMODEM works for ASCII-safe files but may corrupt arbitrary binary data
-
-        For SSH connections, the SSHReaderWriter provides true binary I/O via
-        its read_raw() method.
+        For SSH connections, the SSHReaderWriter provides its own read_raw()
+        method which is used instead.
 
         Returns None on timeout or if no data available.
         """
@@ -281,41 +285,69 @@ class Session:
             )
             if data:
                 self.last_activity = datetime.now()
-                # Convert back to bytes using latin-1 (preserves byte values 0-255)
-                # Note: This only works correctly if the data didn't contain
-                # invalid UTF-8 sequences that were replaced during decoding
-                return data.encode('latin-1', errors='replace') if isinstance(data, str) else data
+                # Convert latin-1 string back to bytes (byte-transparent)
+                return data.encode('latin-1') if isinstance(data, str) else data
             return None
         except asyncio.TimeoutError:
             return None
 
     async def readline(self, prompt: str = "", echo: bool = True, max_length: int = 255) -> str:
+        """Read a line of input with proper encoding support."""
         if prompt:
             await self.write(prompt)
 
-        buffer = []
-        while True:
-            char = await self.read(1)
+        if self.transport_type == SessionTransport.SSH:
+            # SSH: reader returns Unicode chars, build string directly
+            char_buffer = []
+            while True:
+                char = await self.reader.read(1)
+                if not char:
+                    break
 
-            if not char:
-                break
+                self.last_activity = datetime.now()
 
-            if ord(char) == 13 or ord(char) == 10:
-                await self.writeline()
-                break
-
-            elif ord(char) == 8 or ord(char) == 127:
-                if buffer:
-                    buffer.pop()
+                if char in ('\r', '\n'):
+                    await self.writeline()
+                    break
+                elif char in ('\x08', '\x7f'):  # BS or DEL
+                    if char_buffer:
+                        char_buffer.pop()
+                        if echo:
+                            await self.write("\x08 \x08")
+                elif ord(char) >= 32 and len(char_buffer) < max_length:
+                    char_buffer.append(char)
                     if echo:
-                        await self.write(b"\x08 \x08")
+                        await self.write(char)
 
-            elif ord(char) >= 32 and len(buffer) < max_length:
-                buffer.append(char)
-                if echo:
-                    await self.write(char)
+            return "".join(char_buffer)
+        else:
+            # Telnet: read raw bytes via latin-1, buffer and decode at end
+            byte_buffer = bytearray()
+            while True:
+                raw = await self.reader.read(1)
+                if not raw:
+                    break
 
-        return "".join(buffer)
+                byte_val = ord(raw)
+                self.last_activity = datetime.now()
+
+                if byte_val == 13 or byte_val == 10:  # CR or LF
+                    await self.writeline()
+                    break
+                elif byte_val == 8 or byte_val == 127:  # BS or DEL
+                    if byte_buffer:
+                        byte_buffer.pop()
+                        if echo:
+                            await self.write(b"\x08 \x08")
+                elif byte_val >= 32 and len(byte_buffer) < max_length:
+                    byte_buffer.append(byte_val)
+                    if echo:
+                        # Echo byte back via latin-1 transport
+                        if self.writer:
+                            self.writer.write(raw)
+                            await self.writer.drain()
+
+            return bytes(byte_buffer).decode(self.capabilities.encoding, errors='replace')
 
     async def read_password(self, prompt: str = "Password: ", max_length: int = 64) -> str:
         return await self.readline(prompt, echo=False, max_length=max_length)
@@ -395,16 +427,13 @@ class Session:
         return self.user_id is not None and self.state == SessionState.AUTHENTICATED
 
     def set_encoding(self, encoding: str) -> None:
+        """Set the session's character encoding.
+
+        This affects how text is encoded/decoded at the application layer.
+        The transport layer always uses latin-1 (byte-transparent).
+        """
         self.capabilities.encoding = encoding
         self.codec = CodecIO(encoding)
-
-        # Update telnetlib3 writer encoding if it exists
-        if self.writer:
-            if hasattr(self.writer, 'encoding'):
-                self.writer.encoding = encoding
-            if hasattr(self.writer, 'connection') and hasattr(self.writer.connection, 'encoding'):
-                self.writer.connection.encoding = encoding
-
         logger.info(f"Session {self.id}: Encoding set to {encoding}")
 
     def update_display_mode(self) -> None:
