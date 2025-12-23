@@ -32,6 +32,7 @@ class SessionTransport(Enum):
     """Transport type for the session - affects binary I/O handling"""
     TELNET = "telnet"  # Requires IAC escaping for binary data
     SSH = "ssh"        # Raw binary, no escaping needed
+    STDIO = "stdio"    # Raw binary via stdin/stdout (mgetty)
 
 
 class ClientCapabilities:
@@ -83,6 +84,11 @@ class Session:
 
     async def negotiate(self) -> None:
         if not self.writer:
+            return
+
+        # Skip telnet negotiation for non-telnet transports
+        if self.transport_type != SessionTransport.TELNET:
+            self.state = SessionState.LOGIN
             return
 
         self.state = SessionState.NEGOTIATING
@@ -241,12 +247,12 @@ class Session:
         required for binary protocols like XMODEM, ZMODEM, and Kermit.
 
         For telnet sessions, IAC (0xFF) bytes are escaped as 0xFF 0xFF per
-        telnet protocol. SSH sessions send raw bytes without escaping.
+        telnet protocol. SSH and STDIO sessions send raw bytes without escaping.
         """
         if not self.writer:
             return
 
-        # Only escape IAC for telnet - SSH is a raw binary channel
+        # Only escape IAC for telnet - SSH and STDIO are raw binary channels
         if self.transport_type == SessionTransport.TELNET:
             data = data.replace(b'\xff', b'\xff\xff')
 
