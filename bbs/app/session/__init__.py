@@ -84,22 +84,26 @@ class Session:
 
     def __post_init__(self):
         """Initialize components and wire them together."""
-        # Create state component
-        self._state_component = SessionData(
-            id=self.id if self.id else None,  # Will auto-generate if empty
-            state=self.state,
-            transport_type=self.transport_type,
-            user_id=self.user_id,
-            username=self.username,
-            access_level=self.access_level,
-            language=self.language,
-            connected_at=self.connected_at,
-            last_activity=self.last_activity,
-            remote_addr=self.remote_addr,
-            remote_port=self.remote_port,
-            data=self.data,
-            capabilities=self.capabilities,
-        )
+        # Build state component kwargs - only include id if explicitly set
+        state_kwargs = {
+            "state": self.state,
+            "transport_type": self.transport_type,
+            "user_id": self.user_id,
+            "username": self.username,
+            "access_level": self.access_level,
+            "language": self.language,
+            "connected_at": self.connected_at,
+            "last_activity": self.last_activity,
+            "remote_addr": self.remote_addr,
+            "remote_port": self.remote_port,
+            "data": self.data,
+            "capabilities": self.capabilities,
+        }
+        # Only pass id if non-empty, otherwise let default_factory generate UUID
+        if self.id:
+            state_kwargs["id"] = self.id
+
+        self._state_component = SessionData(**state_kwargs)
 
         # Sync id back (may have been auto-generated)
         self.id = self._state_component.id
