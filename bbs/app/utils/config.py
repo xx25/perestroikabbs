@@ -65,6 +65,11 @@ class CharsetConfig(BaseModel):
     ])
 
 
+class LanguageConfig(BaseModel):
+    default_language: str = "en"
+    supported_languages: list[str] = Field(default_factory=lambda: ["en", "ru"])
+
+
 class ChatConfig(BaseModel):
     max_message_length: int = 500
     max_rooms: int = 50
@@ -109,6 +114,7 @@ class Config(BaseSettings):
     transfers: TransferConfig = Field(default_factory=TransferConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     charset: CharsetConfig = Field(default_factory=CharsetConfig)
+    language: LanguageConfig = Field(default_factory=LanguageConfig)
     chat: ChatConfig = Field(default_factory=ChatConfig)
     boards: BoardsConfig = Field(default_factory=BoardsConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)

@@ -60,41 +60,52 @@ class LoginUI:
 
     async def select_language(self) -> None:
         """Allow user to select interface language - now charset is known"""
-        await self.session.writeline()
+        config = get_config()
+        supported = config.language.supported_languages
 
-        # Now we can display language names in their native scripts
-        # because charset has already been selected
-        if self.session.capabilities.encoding in ['utf-8', 'windows-1251', 'koi8-r']:
-            await self.session.writeline("Select your language / Выберите язык / 选择语言:")
-            await self.session.writeline()
-            await self.session.writeline("  [1] English")
-            await self.session.writeline("  [2] Русский (Russian)")
-            await self.session.writeline("  [3] 中文 (Chinese)")
-            await self.session.writeline("  [4] Español (Spanish)")
-            await self.session.writeline("  [5] Français (French)")
-        else:
-            # ASCII or CP437 - use only ASCII characters
-            await self.session.writeline("Select your language:")
-            await self.session.writeline()
-            await self.session.writeline("  [1] English")
-            await self.session.writeline("  [2] Russian")
-            await self.session.writeline("  [3] Chinese")
-            await self.session.writeline("  [4] Spanish")
-            await self.session.writeline("  [5] French")
-        await self.session.writeline()
-
-        choice = await self.session.readline("Choice [1-5]: ")
-
-        language_map = {
-            "1": "en",
-            "2": "ru",
-            "3": "zh",
-            "4": "es",
-            "5": "fr"
+        # Language metadata: code -> (english_name, native_name)
+        LANGUAGE_META = {
+            "en": ("English", "English"),
+            "ru": ("Russian", "Русский"),
+            "zh": ("Chinese", "中文"),
+            "es": ("Spanish", "Español"),
+            "fr": ("French", "Français"),
+            "de": ("German", "Deutsch"),
+            "pl": ("Polish", "Polski"),
+            "uk": ("Ukrainian", "Українська"),
         }
 
-        selected_lang = language_map.get(choice, "en")
-        self.session.set_language(selected_lang)
+        await self.session.writeline()
+
+        # Check if we can display unicode characters
+        can_show_unicode = self.session.capabilities.encoding in ['utf-8', 'windows-1251', 'koi8-r']
+
+        if can_show_unicode:
+            await self.session.writeline("Select your language / Выберите язык:")
+        else:
+            await self.session.writeline("Select your language:")
+
+        await self.session.writeline()
+
+        for i, lang_code in enumerate(supported, 1):
+            eng_name, native_name = LANGUAGE_META.get(lang_code, (lang_code, lang_code))
+            if can_show_unicode and native_name != eng_name:
+                await self.session.writeline(f"  [{i}] {native_name} ({eng_name})")
+            else:
+                await self.session.writeline(f"  [{i}] {eng_name}")
+
+        await self.session.writeline()
+
+        choice = await self.session.readline(f"Choice [1-{len(supported)}]: ")
+
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(supported):
+                self.session.set_language(supported[idx])
+            else:
+                self.session.set_language(config.language.default_language)
+        except ValueError:
+            self.session.set_language(config.language.default_language)
 
     async def select_encoding(self) -> None:
         # Use simple ASCII for charset selection since we don't know encoding yet

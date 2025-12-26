@@ -56,6 +56,10 @@ supported_encodings = [
     "shift_jis"
 ]
 
+[language]
+default_language = "en"
+supported_languages = ["en", "ru"]
+
 [chat]
 max_message_length = 500
 max_rooms = 50
