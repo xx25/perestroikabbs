@@ -1,10 +1,16 @@
-import asyncio
+"""
+Chat room UI module.
+
+Provides real-time chat functionality with database persistence.
+"""
+
 from typing import Dict, List, Optional, Set
 
 from ..session import Session
-from ..storage.container import get_repos
+from ..storage.container import RepositoryContainer, get_repos
 from ..utils.logger import get_logger
-from .menu import Menu
+from .base import UIModule
+from .components.menu_builder import MenuBuilder
 
 logger = get_logger("ui.chat")
 
@@ -131,33 +137,38 @@ class ChatRoom:
                     logger.error(f"Failed to send message to {participant.username}: {e}")
 
 
-class ChatUI:
+class ChatUI(UIModule[None]):
     """Chat room user interface."""
 
-    def __init__(self, session: Session):
-        self.session = session
-        self.repos = get_repos()
+    def __init__(
+        self,
+        session: Session,
+        repos: Optional[RepositoryContainer] = None,
+    ):
+        super().__init__(session, repos)
         self.chat_manager = ChatManager()
 
     async def run(self) -> None:
         """Main chat menu."""
-        menu = Menu(self.session, "Chat Rooms")
+        if not await self.check_access():
+            return
 
-        menu.add_item("1", "Main Lobby", lambda: self.join_room("main"))
-        menu.add_item("2", "Tech Talk", lambda: self.join_room("tech"))
-        menu.add_item("3", "Random", lambda: self.join_room("random"))
-        menu.add_item("L", "List Active Rooms", self.list_rooms)
-        menu.add_item("Q", "Back", lambda: setattr(menu, "running", False))
+        menu = (
+            MenuBuilder(self.session, "Chat Rooms")
+            .option("1", "Main Lobby", lambda: self._join_room("main"))
+            .option("2", "Tech Talk", lambda: self._join_room("tech"))
+            .option("3", "Random", lambda: self._join_room("random"))
+            .separator()
+            .option("L", "List Active Rooms", self._list_rooms)
+            .back("Q", "Back")
+        )
 
         await menu.run()
 
-    async def list_rooms(self) -> None:
+    async def _list_rooms(self) -> None:
         """List all active chat rooms."""
-        await self.session.clear_screen()
-        await self.session.writeline("=== Active Chat Rooms ===")
-        await self.session.writeline()
+        await self.clear_and_header("Active Chat Rooms")
 
-        # Show in-memory active rooms with participant counts
         rooms = self.chat_manager.rooms
         if not rooms:
             await self.session.writeline("No active chat rooms.")
@@ -166,16 +177,13 @@ class ChatUI:
                 user_count = len(room.participants)
                 await self.session.writeline(f"  {room_name}: {user_count} user(s)")
 
-        await self.session.writeline("\r\nPress any key to continue...")
-        await self.session.read(1)
+        await self.pause()
 
-    async def join_room(self, room_name: str) -> None:
+    async def _join_room(self, room_name: str) -> None:
         """Join a chat room."""
-        # Get or create room (async - may create in database)
         room = await self.chat_manager.get_or_create_room(room_name)
 
-        await self.session.clear_screen()
-        await self.session.writeline(f"=== Chat Room: {room_name} ===")
+        await self.clear_and_header(f"Chat Room: {room_name}")
         await self.session.writeline("Type /help for commands, /quit to exit")
         await self.session.writeline("-" * 50)
 
@@ -187,11 +195,12 @@ class ChatUI:
         await room.add_participant(self.session)
 
         try:
-            await self.chat_loop(room)
+            await self._chat_loop(room)
         finally:
             await room.remove_participant(self.session)
 
-    async def chat_loop(self, room: ChatRoom) -> None:
+    async def _chat_loop(self, room: ChatRoom) -> None:
+        """Main chat input loop."""
         await self.session.writeline()
         await self.session.writeline("You are now in the chat room. Start typing!")
         await self.session.writeline()
@@ -203,16 +212,22 @@ class ChatUI:
                 continue
 
             if message.startswith("/"):
-                if not await self.handle_command(message, room):
+                if not await self._handle_command(message, room):
                     break
             else:
                 await room.broadcast(message, self.session)
 
-    async def handle_command(self, command: str, room: ChatRoom) -> bool:
+    async def _handle_command(self, command: str, room: ChatRoom) -> bool:
+        """
+        Handle chat commands.
+
+        Returns:
+            True to continue chat loop, False to exit
+        """
         cmd_parts = command.split()
         cmd = cmd_parts[0].lower()
 
-        if cmd == "/quit" or cmd == "/exit":
+        if cmd in ("/quit", "/exit"):
             await self.session.writeline("Leaving chat room...")
             return False
 
@@ -241,7 +256,9 @@ class ChatUI:
 
             for participant in room.participants:
                 if participant.username == target_username:
-                    await participant.writeline(f"\r[Whisper from {self.session.username}]: {whisper_msg}")
+                    await participant.writeline(
+                        f"\r[Whisper from {self.session.username}]: {whisper_msg}"
+                    )
                     await self.session.writeline(f"[Whisper to {target_username}]: {whisper_msg}")
                     break
             else:
