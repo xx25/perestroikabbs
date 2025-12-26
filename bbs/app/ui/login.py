@@ -209,7 +209,23 @@ class LoginUI:
 
             user = await self.user_repo.get_by_username(username)
 
-            if user and await self.auth_manager.verify_password(password, user.password_hash):
+            if user:
+                valid, needs_rehash = await self.auth_manager.verify_password(
+                    password, user.password_hash
+                )
+                if not valid:
+                    await self.session.writeline(f"\r\n{self.session.t('login.invalid_credentials')}")
+                    if attempt < self.max_attempts - 1:
+                        await self.session.writeline(f"Attempts remaining: {self.max_attempts - attempt - 1}")
+                    await asyncio.sleep(1)
+                    continue
+
+                # Rehash password if using outdated parameters
+                if needs_rehash:
+                    new_hash = await self.auth_manager.hash_password(password)
+                    await self.user_repo.update_password(user.id, new_hash)
+                    logger.info(f"Rehashed password for user {user.username}")
+
                 self.session.user_id = user.id
                 self.session.username = user.username
                 self.session.access_level = user.access_level

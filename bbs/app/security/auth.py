@@ -29,22 +29,31 @@ class AuthManager:
             logger.error(f"Error hashing password: {e}")
             raise
 
-    async def verify_password(self, password: str, hash: str) -> bool:
+    async def verify_password(self, password: str, hash: str) -> tuple[bool, bool]:
+        """
+        Verify a password against its hash.
+
+        Args:
+            password: The plaintext password to verify.
+            hash: The Argon2 hash to verify against.
+
+        Returns:
+            A tuple of (password_valid, needs_rehash).
+            - password_valid: True if the password matches the hash.
+            - needs_rehash: True if the hash should be updated with new parameters.
+        """
         try:
             self.hasher.verify(hash, password)
-
-            if self.hasher.check_needs_rehash(hash):
-                return True
-
-            return True
+            needs_rehash = self.hasher.check_needs_rehash(hash)
+            return True, needs_rehash
         except (VerifyMismatchError, VerificationError):
-            return False
+            return False, False
         except InvalidHash:
             logger.warning("Invalid password hash format")
-            return False
+            return False, False
         except Exception as e:
             logger.error(f"Error verifying password: {e}")
-            return False
+            return False, False
 
     def is_password_secure(self, password: str, username: Optional[str] = None) -> tuple[bool, str]:
         if len(password) < self.min_password_length:

@@ -3,17 +3,44 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import toml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
+
+from ..exceptions import ConfigurationError
 
 
 class ServerConfig(BaseModel):
+    """Server configuration with validation."""
+
     host: str = "0.0.0.0"
     port: int = 2323
     motd_asset: str = "ansi/motd.ans"
     max_connections: int = 100
     connection_timeout: int = 300
     welcome_message: str = "Welcome to Perestroika BBS!"
+
+    @field_validator('port')
+    @classmethod
+    def validate_port(cls, v: int) -> int:
+        if not 1 <= v <= 65535:
+            raise ConfigurationError(f"Port must be 1-65535, got {v}")
+        return v
+
+    @field_validator('max_connections')
+    @classmethod
+    def validate_max_connections(cls, v: int) -> int:
+        if v < 1:
+            raise ConfigurationError("max_connections must be positive")
+        if v > 10000:
+            raise ConfigurationError("max_connections too high (max 10000)")
+        return v
+
+    @field_validator('connection_timeout')
+    @classmethod
+    def validate_timeout(cls, v: int) -> int:
+        if v < 0:
+            raise ConfigurationError("connection_timeout cannot be negative")
+        return v
 
 
 class TelnetConfig(BaseModel):
@@ -25,12 +52,40 @@ class TelnetConfig(BaseModel):
 
 
 class DatabaseConfig(BaseModel):
+    """Database configuration with validation."""
+
     dsn: str
     echo: bool = False
     pool_size: int = 20
     max_overflow: int = 10
     pool_timeout: int = 30
     pool_recycle: int = 3600
+
+    @field_validator('dsn')
+    @classmethod
+    def validate_dsn(cls, v: str) -> str:
+        if not v.startswith(('mysql', 'postgresql', 'sqlite')):
+            raise ConfigurationError(f"Unsupported database driver: {v.split(':')[0]}")
+        return v
+
+    @field_validator('pool_size')
+    @classmethod
+    def validate_pool_size(cls, v: int) -> int:
+        if v < 1:
+            raise ConfigurationError("pool_size must be positive")
+        if v > 100:
+            raise ConfigurationError("pool_size too high (max 100)")
+        return v
+
+    @model_validator(mode='after')
+    def validate_pool_settings(self):
+        """Validate pool settings are reasonable together."""
+        total = self.pool_size + self.max_overflow
+        if total > 200:
+            raise ConfigurationError(
+                f"Total pool connections ({total}) too high (max 200)"
+            )
+        return self
 
 
 class TransferConfig(BaseModel):
@@ -46,6 +101,8 @@ class TransferConfig(BaseModel):
 
 
 class SecurityConfig(BaseModel):
+    """Security configuration with validation."""
+
     argon2_time_cost: int = 3
     argon2_memory_cost: int = 65536
     argon2_parallelism: int = 4
@@ -54,6 +111,24 @@ class SecurityConfig(BaseModel):
     session_timeout: int = 3600
     require_secure_passwords: bool = True
     min_password_length: int = 8
+
+    @field_validator('min_password_length')
+    @classmethod
+    def validate_min_password_length(cls, v: int) -> int:
+        if v < 6:
+            raise ConfigurationError("min_password_length must be at least 6")
+        if v > 128:
+            raise ConfigurationError("min_password_length too high (max 128)")
+        return v
+
+    @field_validator('argon2_memory_cost')
+    @classmethod
+    def validate_argon2_memory(cls, v: int) -> int:
+        if v < 8192:
+            raise ConfigurationError("argon2_memory_cost too low (min 8192)")
+        if v > 1048576:
+            raise ConfigurationError("argon2_memory_cost too high (max 1048576)")
+        return v
 
 
 class CharsetConfig(BaseModel):

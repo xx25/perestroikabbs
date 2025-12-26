@@ -8,9 +8,12 @@ Supports 4 display modes:
 - 40x24 plain text
 """
 
-from .engine import TemplateEngine, DisplayMode, DisplayConfig
+from .engine import TemplateEngine
 from .converters import CharsetConverter
 from .helpers import ANSIHelper, BoxDrawingHelper
+
+# Re-export from centralized display module for backward compatibility
+from ..display import DisplayMode, DisplayConfig
 
 __all__ = [
     'TemplateEngine',

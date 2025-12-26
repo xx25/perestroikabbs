@@ -2,8 +2,6 @@
 Template engine for BBS screens
 """
 import os
-from enum import Enum
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Any
 
@@ -11,40 +9,10 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape, TemplateNot
 
 from .converters import CharsetConverter
 from .helpers import ANSIHelper, BoxDrawingHelper
+from ..display import DisplayMode, DisplayConfig
 from ..utils.logger import get_logger
 
 logger = get_logger("templates.engine")
-
-
-class DisplayMode(Enum):
-    """Four supported display modes"""
-    STANDARD_ANSI = "80x24_ansi"    # 80x24 with ANSI
-    STANDARD_PLAIN = "80x24_plain"   # 80x24 without ANSI
-    NARROW_ANSI = "40x24_ansi"       # 40x24 with ANSI
-    NARROW_PLAIN = "40x24_plain"     # 40x24 without ANSI
-
-
-@dataclass
-class DisplayConfig:
-    """Display configuration for a session"""
-    width: int
-    height: int
-    ansi: bool
-    mode: DisplayMode
-
-    @classmethod
-    def from_session(cls, session) -> 'DisplayConfig':
-        """Create display config from session capabilities"""
-        width = session.capabilities.cols
-        height = session.capabilities.rows
-        ansi = session.capabilities.ansi
-
-        if width == 40:
-            mode = DisplayMode.NARROW_ANSI if ansi else DisplayMode.NARROW_PLAIN
-        else:
-            mode = DisplayMode.STANDARD_ANSI if ansi else DisplayMode.STANDARD_PLAIN
-
-        return cls(width=width, height=height, ansi=ansi, mode=mode)
 
 
 class TemplateEngine:
