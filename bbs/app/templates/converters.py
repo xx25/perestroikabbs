@@ -112,13 +112,10 @@ class CharsetConverter:
         encoding_lower = encoding.lower()
 
         # Convert box drawing characters based on encoding
-        if encoding_lower == 'utf-8':
-            # UTF-8 can handle everything
+        # UTF-8, CP437, CP866 handle box chars natively via Python codec
+        if encoding_lower in ('utf-8', 'cp437', 'cp866') or '437' in encoding_lower or '866' in encoding_lower:
+            # These encodings have box drawing chars - Python codec handles directly
             pass
-        elif encoding_lower == 'cp437' or '437' in encoding_lower:
-            text = self._convert_box_chars(text, 'cp437')
-        elif encoding_lower == 'cp866' or '866' in encoding_lower:
-            text = self._convert_box_chars(text, 'cp866')
         elif any(enc in encoding_lower for enc in self.ASCII_BOX_ENCODINGS):
             # These encodings don't have box drawing chars, use ASCII
             text = self._convert_box_chars(text, 'ascii')
