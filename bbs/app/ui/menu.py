@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from typing import Callable, Dict, List, Optional, Tuple
 
 from ..session import Session, SessionState
@@ -97,7 +98,9 @@ class Menu:
                     await item.submenu.run()
                 elif item.handler:
                     try:
-                        await item.handler()
+                        result = item.handler()
+                        if inspect.iscoroutine(result):
+                            await result
                     except Exception as e:
                         logger.error(f"Menu handler error: {e}", exc_info=True)
                         await self.session.writeline(f"\r\nError: {e}")
