@@ -277,7 +277,14 @@ class Session:
 
     def t(self, key: str, **kwargs) -> str:
         """Translate a string using the session's current language."""
-        return self.translator.get(key, **kwargs)
+        text = self.translator.get(key, **kwargs)
+
+        # Apply transliteration for 7-bit ASCII mode with Russian
+        if self.capabilities.seven_bit and self.language == 'ru':
+            from ..i18n.translit import transliterate
+            text = transliterate(text)
+
+        return text
 
     def set_language(self, lang_code: str) -> bool:
         """Change the session's language."""

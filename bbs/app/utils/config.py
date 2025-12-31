@@ -138,6 +138,8 @@ class CharsetConfig(BaseModel):
         "iso-8859-7", "koi8-r", "windows-1251", "windows-1252",
         "macintosh", "shift_jis"
     ])
+    charset_preview_text: str = "Перестройка"
+    charset_preview_translit: str = "Perestrojka"
 
 
 class LanguageConfig(BaseModel):

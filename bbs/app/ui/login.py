@@ -110,35 +110,42 @@ class LoginUI:
     async def select_encoding(self) -> None:
         # Use simple ASCII for charset selection since we don't know encoding yet
         logger.info(f"Starting charset selection for session {self.session.id}")
-        await self.session.writeline("\r\nSelect charset:")
+
+        config = get_config()
+        preview_text = config.charset.charset_preview_text
+        preview_translit = config.charset.charset_preview_translit
+
+        await self.session.writeline("\r\nSelect charset (find the line with correct text):")
+        await self.session.writeline()
 
         encodings = self.charset_manager.get_encoding_menu()
-        # Make menu more compact for 40-column display
-        for i, (display, _) in enumerate(encodings, 1):
-            # Shorten display names for compact view
-            short_display = display.replace("(default)", "").strip()
-            await self.session.writeline(f" [{i}] {short_display}")
 
-        await self.session.writeline(f" [0] Auto-detect")
+        for i, (display, encoding) in enumerate(encodings, 1):
+            # Build line prefix
+            prefix = f" [{i}] {display}: "
+            await self.session.write(prefix)
+
+            if encoding == "ascii":
+                # Show transliteration for 7-bit ASCII
+                await self.session.writeline(preview_translit)
+            else:
+                # Encode preview text in this encoding and send raw bytes
+                try:
+                    encoded_bytes = preview_text.encode(encoding, errors='replace')
+                    # Send via latin-1 (byte-transparent transport)
+                    await self.session.write(encoded_bytes.decode('latin-1'))
+                    await self.session.writeline()
+                except Exception:
+                    await self.session.writeline("(encoding error)")
+
+        await self.session.writeline()
 
         while True:
-            choice = await self.session.readline("Choice: ")
+            choice = await self.session.readline(f"Choice [1-{len(encodings)}]: ")
 
             try:
                 idx = int(choice)
-                if idx == 0:
-                    test_string = "Testing: ╔═╗ █▓▒░ ♠♥♦♣"
-                    await self.session.write(f"\r\n{test_string}\r\n")
-                    await self.session.writeline("Do you see the special characters correctly?")
-                    confirm = await self.session.readline("(Y/N): ")
-
-                    if confirm.upper() == "Y":
-                        break
-                    else:
-                        await self.session.writeline("Please select your encoding manually.")
-                        continue
-
-                elif 1 <= idx <= len(encodings):
+                if 1 <= idx <= len(encodings):
                     encoding = encodings[idx - 1][1]
                     self.session.set_encoding(encoding)
                     # Special handling for ASCII mode
@@ -226,24 +233,6 @@ class LoginUI:
                 self.session.username = user.username
                 self.session.access_level = user.access_level
 
-                # Ask if user wants to use saved preferences
-                await self.session.writeline()
-                if user.encoding_pref or (user.terminal_cols and user.terminal_rows):
-                    await self.session.writeline(self.session.t('login.saved_preferences'))
-                    if user.encoding_pref:
-                        await self.session.writeline(f"  {self.session.t('login.pref_encoding', encoding=user.encoding_pref)}")
-                    if user.terminal_cols and user.terminal_rows:
-                        await self.session.writeline(f"  {self.session.t('login.pref_terminal', cols=user.terminal_cols, rows=user.terminal_rows)}")
-
-                    use_saved = await self.session.readline(f"\r\n{self.session.t('login.use_saved_prefs')}: ")
-                    # Accept Y/Д for yes (Russian Д = Da = Yes)
-                    if use_saved.upper() not in ('N', 'Н'):
-                        if user.encoding_pref:
-                            self.session.set_encoding(user.encoding_pref)
-                        if user.terminal_cols and user.terminal_rows:
-                            self.session.capabilities.cols = user.terminal_cols
-                            self.session.capabilities.rows = user.terminal_rows
-
                 await self.user_repo.update_last_login(user.id)
                 logger.info(f"User {username} logged in (Session: {self.session.id})")
                 return True
@@ -299,11 +288,6 @@ class LoginUI:
         real_name = await self.session.readline(f"{self.session.t('register.realname_prompt')}: ")
         location = await self.session.readline(f"{self.session.t('register.location_prompt')}: ")
 
-        # Save terminal preferences
-        encoding_pref = self.session.capabilities.encoding
-        terminal_cols = self.session.capabilities.cols
-        terminal_rows = self.session.capabilities.rows
-
         password_hash = await self.auth_manager.hash_password(password)
 
         user = await self.user_repo.create(
@@ -313,26 +297,6 @@ class LoginUI:
             real_name=real_name or None,
             location=location or None,
         )
-
-        # Update user preferences after creation
-        if user:
-            await self.user_repo.update_terminal_settings(
-                user.id,
-                encoding_pref,
-                terminal_cols,
-                terminal_rows
-            )
-            # Also save language preference
-            from ..storage.db import get_session
-            from sqlalchemy import update
-            from ..storage.models import User as UserModel
-            async with get_session() as db_session:
-                await db_session.execute(
-                    update(UserModel)
-                    .where(UserModel.id == user.id)
-                    .values(language_pref=self.session.language)
-                )
-                await db_session.commit()
 
         if user:
             self.session.user_id = user.id

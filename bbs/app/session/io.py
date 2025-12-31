@@ -135,16 +135,24 @@ class SessionIO:
             # SSH: writer handles UTF-8 encoding, pass strings directly
             if isinstance(data, bytes):
                 data = data.decode(self.capabilities.encoding, errors='replace')
+            # Apply transliteration for 7-bit mode (converts Cyrillic to Latin)
+            if self.capabilities.seven_bit:
+                from ..i18n.translit import transliterate
+                data = transliterate(data)
             self.writer.write(data)
             await self.writer.drain()
         else:
             # Telnet: use latin-1 byte-transparent transport
             if isinstance(data, str):
+                # Apply transliteration for 7-bit mode (converts Cyrillic to Latin)
+                if self.capabilities.seven_bit:
+                    from ..i18n.translit import transliterate
+                    data = transliterate(data)
                 data_bytes = data.encode(self.capabilities.encoding, errors='replace')
             else:
                 data_bytes = data
 
-            # Apply 7-bit mask if needed
+            # Apply 7-bit mask if needed (safety fallback)
             if self.capabilities.seven_bit:
                 data_bytes = bytes(b & 0x7F for b in data_bytes)
 
