@@ -11,7 +11,7 @@
     "back": "Назад",
     "cancel": "Отмена",
     "continue": "Нажмите любую клавишу...",
-    "continue_short": "[Любая]",
+    "continue_short": "[Нажмите любую клавишу]",
     "invalid_choice": "Неверный выбор.",
     "invalid_input": "Неверный ввод.",
     "error": "Ошибка: {message}",
@@ -41,7 +41,7 @@
     "terminal_40x24_plain": "40x24 простой текст (Узкий, без цветов)",
     "terminal_selected": "Выбрано: {mode}",
     "detected_size": "Определенный размер терминала: {cols}x{rows}",
-    "override_size": "Изменить размер терминала? (Д/Н) [Н]",
+    "override_size": "Изменить размер терминала? (Y/N) [N]",
     "username_prompt": "Имя пользователя",
     "password_prompt": "Пароль",
     "login_option": "Войти с существующей учетной записью",
@@ -58,9 +58,8 @@
     "welcome_back": "С возвращением, {username}!",
     "guest_login": "Вход выполнен как Гость (ограниченный доступ)",
     "saved_preferences": "Ваши сохраненные настройки:",
-    "pref_encoding": "Кодировка: {encoding}",
     "pref_terminal": "Терминал: {cols}x{rows}",
-    "use_saved_prefs": "Использовать сохраненные настройки? (Д/Н) [Д]"
+    "use_saved_prefs": "Использовать сохраненные настройки? (Y/N) [Y]"
   },
   "register": {
     "title": "=== Регистрация нового пользователя ===",
@@ -116,6 +115,15 @@
     "current_language": "Текущий язык: {language}",
     "change_language": "Изменить язык интерфейса"
   },
+  "users": {
+    "title": "Список пользователей",
+    "username": "Имя",
+    "last_login": "Последний вход",
+    "location": "Местоположение",
+    "never": "Никогда",
+    "unknown": "Неизвестно",
+    "no_users": "Пользователи не найдены."
+  },
   "boards": {
     "title": "=== Доски сообщений ===",
     "list_title": "Доступные доски",
@@ -169,7 +177,7 @@
     "select_room": "Выберите комнату",
     "create_room": "Создать новую комнату",
     "room_name": "Название комнаты",
-    "room_private": "Сделать комнату приватной? (Д/Н)",
+    "room_private": "Сделать комнату приватной? (Y/N)",
     "room_created": "Комната успешно создана!",
     "joined_room": "Вошли в комнату: {room}",
     "left_room": "Покинули комнату: {room}",

@@ -11,7 +11,7 @@
     "back": "Back",
     "cancel": "Cancel",
     "continue": "Press any key to continue...",
-    "continue_short": "[Any Key]",
+    "continue_short": "[Press a key]",
     "invalid_choice": "Invalid choice.",
     "invalid_input": "Invalid input.",
     "error": "Error: {message}",
@@ -58,7 +58,6 @@
     "welcome_back": "Welcome back, {username}!",
     "guest_login": "Logged in as Guest (limited access)",
     "saved_preferences": "Your saved preferences:",
-    "pref_encoding": "Encoding: {encoding}",
     "pref_terminal": "Terminal: {cols}x{rows}",
     "use_saved_prefs": "Use saved preferences? (Y/N) [Y]"
   },
@@ -115,6 +114,15 @@
     "encoding_changed": "Encoding changed to {encoding}",
     "current_language": "Current language: {language}",
     "change_language": "Change interface language"
+  },
+  "users": {
+    "title": "User List",
+    "username": "Username",
+    "last_login": "Last Login",
+    "location": "Location",
+    "never": "Never",
+    "unknown": "Unknown",
+    "no_users": "No users found."
   },
   "boards": {
     "title": "=== Message Boards ===",

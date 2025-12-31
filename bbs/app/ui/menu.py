@@ -153,7 +153,7 @@ class MainMenu(Menu):
 
     async def user_list(self) -> None:
         await self.session.clear_screen()
-        await self.session.writeline("=== User List ===")
+        await self.session.writeline(f"=== {self.session.t('users.title')} ===")
         await self.session.writeline()
 
         from ..storage.repositories import UserRepository
@@ -161,18 +161,21 @@ class MainMenu(Menu):
         users = await user_repo.get_active_users(limit=50)
 
         if users:
-            await self.session.writeline(f"{'Username':<20} {'Last Login':<20} {'Location':<20}")
+            username_hdr = self.session.t('users.username')
+            last_login_hdr = self.session.t('users.last_login')
+            location_hdr = self.session.t('users.location')
+            await self.session.writeline(f"{username_hdr:<20} {last_login_hdr:<20} {location_hdr:<20}")
             await self.session.writeline("-" * 60)
 
             for user in users:
-                last_login = user.last_login_at.strftime("%Y-%m-%d %H:%M") if user.last_login_at else "Never"
-                location = user.location[:18] if user.location else "Unknown"
+                last_login = user.last_login_at.strftime("%Y-%m-%d %H:%M") if user.last_login_at else self.session.t('users.never')
+                location = user.location[:18] if user.location else self.session.t('users.unknown')
                 await self.session.writeline(f"{user.username:<20} {last_login:<20} {location:<20}")
         else:
-            await self.session.writeline("No users found.")
+            await self.session.writeline(self.session.t('users.no_users'))
 
         await self.session.writeline()
-        await self.session.writeline("Press any key to continue...")
+        await self.session.writeline(self.session.t('common.continue'))
         await self.session.read(1)
 
     async def system_stats(self) -> None:
