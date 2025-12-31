@@ -121,22 +121,22 @@ class LoginUI:
         encodings = self.charset_manager.get_encoding_menu()
 
         for i, (display, encoding) in enumerate(encodings, 1):
-            # Build line prefix
+            # Build line prefix (ASCII-safe)
             prefix = f" [{i}] {display}: "
-            await self.session.write(prefix)
 
             if encoding == "ascii":
                 # Show transliteration for 7-bit ASCII
-                await self.session.writeline(preview_translit)
+                await self.session.writeline(prefix + preview_translit)
             else:
                 # Encode preview text in this encoding and send raw bytes
                 try:
                     encoded_bytes = preview_text.encode(encoding, errors='replace')
-                    # Send via latin-1 (byte-transparent transport)
-                    await self.session.write(encoded_bytes.decode('latin-1'))
-                    await self.session.writeline()
+                    # Send prefix + raw encoded bytes + newline via write_raw
+                    # to bypass session encoding (which would mangle the bytes)
+                    line_bytes = prefix.encode('ascii') + encoded_bytes + b'\r\n'
+                    await self.session.write_raw(line_bytes)
                 except Exception:
-                    await self.session.writeline("(encoding error)")
+                    await self.session.writeline(prefix + "(encoding error)")
 
         await self.session.writeline()
 
