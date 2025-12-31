@@ -78,7 +78,7 @@ class Menu:
         await self.session.writeline()
 
     async def get_choice(self) -> Optional[MenuItem]:
-        prompt = "Your choice: "
+        prompt = f"{self.session.t('login.your_choice')}: "
         choice = (await self.session.readline(prompt)).upper()
 
         for item in self.items:
@@ -119,7 +119,7 @@ class MainMenu(Menu):
         self.add_item("C", self.session.t('menu.chat'), self.chat_rooms)
         self.add_item("F", self.session.t('menu.files'), self.file_library)
         self.add_item("U", self.session.t('menu.users'), self.user_list)
-        self.add_item("S", "System Stats", self.system_stats)
+        self.add_item("S", self.session.t('admin.system_stats'), self.system_stats)
         self.add_item("P", self.session.t('menu.settings'), self.personal_settings)
 
         if self.session.access_level >= 10:

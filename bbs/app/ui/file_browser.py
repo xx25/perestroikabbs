@@ -20,7 +20,7 @@ class FileBrowser:
         self.config = get_config()
 
     async def run(self) -> None:
-        menu = Menu(self.session, "File Library")
+        menu = Menu(self.session, self.session.t('files.title').strip('= '))
 
         areas = await self.file_repo.get_areas(self.session.access_level)
 
@@ -31,9 +31,9 @@ class FileBrowser:
                 lambda a=area: self.browse_area(a),
             )
 
-        menu.add_item("U", "Upload File", self.upload_file)
-        menu.add_item("S", "Search Files", self.search_files)
-        menu.add_item("Q", "Back", lambda: setattr(menu, "running", False))
+        menu.add_item("U", self.session.t('files.upload'), self.upload_file)
+        menu.add_item("S", self.session.t('files.search'), self.search_files)
+        menu.add_item("Q", self.session.t('common.back'), lambda: setattr(menu, "running", False))
 
         await menu.run()
 
@@ -63,7 +63,7 @@ class FileBrowser:
         await self.session.writeline()
         await self.session.writeline("Commands: [D]ownload, [V]iew info, [Q]uit")
 
-        choice = await self.session.readline("Your choice: ")
+        choice = await self.session.readline(f"{self.session.t('login.your_choice')}: ")
 
         if choice.upper() == "D":
             await self.download_file(files)

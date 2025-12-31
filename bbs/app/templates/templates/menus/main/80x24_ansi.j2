@@ -1,6 +1,6 @@
 {# Main Menu for 80x24 with ANSI #}
 {% extends "base/screen.j2" %}
-{% import "base/macros.j2" as macros %}
+{% import "base/macros.j2" as macros with context %}
 
 {% block content %}
 {{ ansi.color(fg=6) }}
@@ -25,4 +25,4 @@
 
 {{ ansi.color(fg=3) }}{{ macros.status_line(username, access_level, session_time|default("00:00"), 80) }}{{ ansi.reset() }}
 
-{{ ansi.color(fg=7, bold=True) }}Your choice: {{ ansi.reset() }}
+{{ ansi.color(fg=7, bold=True) }}{{ t('login.your_choice') }}: {{ ansi.reset() }}

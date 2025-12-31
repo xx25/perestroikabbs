@@ -187,7 +187,7 @@ class MenuBuilder:
             await self.render()
             await self.session.writeline()
 
-            choice = (await self.session.readline("Your choice: ")).upper().strip()
+            choice = (await self.session.readline(f"{self.session.t('login.your_choice')}: ")).upper().strip()
 
             for opt in self.options:
                 if opt.key == choice and opt.enabled:
@@ -225,7 +225,7 @@ class MenuBuilder:
         await self.render()
         await self.session.writeline()
 
-        choice = (await self.session.readline("Your choice: ")).upper().strip()
+        choice = (await self.session.readline(f"{self.session.t('login.your_choice')}: ")).upper().strip()
 
         for opt in self.options:
             if opt.key == choice and opt.enabled:

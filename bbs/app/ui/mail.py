@@ -17,12 +17,12 @@ class MailUI:
         self.mail_repo = MailRepository()
 
     async def run(self) -> None:
-        menu = Menu(self.session, "Private Mail")
+        menu = Menu(self.session, self.session.t('mail.title').strip('= '))
 
-        menu.add_item("I", "Inbox", self.inbox)
-        menu.add_item("S", "Sent", self.sent)
-        menu.add_item("C", "Compose", self.compose)
-        menu.add_item("Q", "Back", lambda: setattr(menu, "running", False))
+        menu.add_item("I", self.session.t('mail.inbox'), self.inbox)
+        menu.add_item("S", self.session.t('mail.sent'), self.sent)
+        menu.add_item("C", self.session.t('mail.compose'), self.compose)
+        menu.add_item("Q", self.session.t('common.back'), lambda: setattr(menu, "running", False))
 
         await menu.run()
 
@@ -58,7 +58,7 @@ class MailUI:
         await self.session.writeline()
         await self.session.writeline("Commands: [R]ead, [D]elete, [Q]uit")
 
-        choice = await self.session.readline("Your choice: ")
+        choice = await self.session.readline(f"{self.session.t('login.your_choice')}: ")
 
         if choice.upper() == "R" and messages:
             await self.read_message(messages)
@@ -184,7 +184,7 @@ class MailUI:
                 await self.session.writeline("-" * 50)
                 await self.session.writeline("Commands: [R]eply, [D]elete, [Q]uit")
 
-                choice = await self.session.readline("Your choice: ")
+                choice = await self.session.readline(f"{self.session.t('login.your_choice')}: ")
 
                 if choice.upper() == "R":
                     await self.reply_message(msg, sender_name)

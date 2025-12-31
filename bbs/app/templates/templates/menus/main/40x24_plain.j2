@@ -1,6 +1,6 @@
 {# Main Menu for 40x24 without ANSI - Plain text narrow layout #}
 {% extends "base/screen.j2" %}
-{% import "base/macros.j2" as macros %}
+{% import "base/macros.j2" as macros with context %}
 
 {% block content %}
 +--------------------------------------+
@@ -22,4 +22,4 @@
 ========================================
 {{ macros.status_line(username, access_level, session_time|default("00:00"), 40) }}
 
-Choice:
+{{ t('login.choice_prompt') }}:
