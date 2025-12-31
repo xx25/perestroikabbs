@@ -94,13 +94,26 @@ class ChatRoom:
     async def add_participant(self, session: Session) -> None:
         """Add a participant to the room."""
         self.participants.add(session)
-        await self.broadcast(f"*** {session.username} has entered the room", None)
+        # Broadcast join message in each participant's language
+        for participant in self.participants:
+            if participant != session:
+                msg = f"*** {participant.t('chat.user_joined', user=session.username)}"
+                try:
+                    await participant.writeline(f"\r{msg}")
+                except Exception:
+                    pass
 
     async def remove_participant(self, session: Session) -> None:
         """Remove a participant from the room."""
         if session in self.participants:
             self.participants.remove(session)
-            await self.broadcast(f"*** {session.username} has left the room", None)
+            # Broadcast leave message in each participant's language
+            for participant in self.participants:
+                msg = f"*** {participant.t('chat.user_left', user=session.username)}"
+                try:
+                    await participant.writeline(f"\r{msg}")
+                except Exception:
+                    pass
 
     async def broadcast(
         self, message: str, sender: Optional[Session], persist: bool = True
@@ -154,28 +167,28 @@ class ChatUI(UIModule[None]):
             return
 
         menu = (
-            MenuBuilder(self.session, "Chat Rooms")
-            .option("1", "Main Lobby", lambda: self._join_room("main"))
-            .option("2", "Tech Talk", lambda: self._join_room("tech"))
-            .option("3", "Random", lambda: self._join_room("random"))
+            MenuBuilder(self.session, self.session.t('chat.title').strip('= '))
+            .option("1", self.session.t('chat.main_lobby'), lambda: self._join_room("main"))
+            .option("2", self.session.t('chat.tech_talk'), lambda: self._join_room("tech"))
+            .option("3", self.session.t('chat.random'), lambda: self._join_room("random"))
             .separator()
-            .option("L", "List Active Rooms", self._list_rooms)
-            .back("Q", "Back")
+            .option("L", self.session.t('chat.room_list'), self._list_rooms)
+            .back("Q", self.session.t('common.back'))
         )
 
         await menu.run()
 
     async def _list_rooms(self) -> None:
         """List all active chat rooms."""
-        await self.clear_and_header("Active Chat Rooms")
+        await self.clear_and_header(self.session.t('chat.active_rooms'))
 
         rooms = self.chat_manager.rooms
         if not rooms:
-            await self.session.writeline("No active chat rooms.")
+            await self.session.writeline(self.session.t('chat.no_active_rooms'))
         else:
             for room_name, room in rooms.items():
                 user_count = len(room.participants)
-                await self.session.writeline(f"  {room_name}: {user_count} user(s)")
+                await self.session.writeline(f"  {room_name}: {self.session.t('chat.users_count', count=user_count)}")
 
         await self.pause()
 
@@ -183,8 +196,8 @@ class ChatUI(UIModule[None]):
         """Join a chat room."""
         room = await self.chat_manager.get_or_create_room(room_name)
 
-        await self.clear_and_header(f"Chat Room: {room_name}")
-        await self.session.writeline("Type /help for commands, /quit to exit")
+        await self.clear_and_header(self.session.t('chat.room_header', room=room_name))
+        await self.session.writeline(self.session.t('chat.type_help'))
         await self.session.writeline("-" * 50)
 
         # Load history from database
@@ -202,7 +215,7 @@ class ChatUI(UIModule[None]):
     async def _chat_loop(self, room: ChatRoom) -> None:
         """Main chat input loop."""
         await self.session.writeline()
-        await self.session.writeline("You are now in the chat room. Start typing!")
+        await self.session.writeline(self.session.t('chat.now_chatting'))
         await self.session.writeline()
 
         while True:
@@ -228,20 +241,20 @@ class ChatUI(UIModule[None]):
         cmd = cmd_parts[0].lower()
 
         if cmd in ("/quit", "/exit"):
-            await self.session.writeline("Leaving chat room...")
+            await self.session.writeline(self.session.t('chat.leaving'))
             return False
 
         elif cmd == "/help":
-            await self.session.writeline("\r\n=== Chat Commands ===")
-            await self.session.writeline("  /quit, /exit - Leave the chat room")
-            await self.session.writeline("  /who - List users in room")
-            await self.session.writeline("  /me <action> - Perform an action")
-            await self.session.writeline("  /whisper <user> <msg> - Private message")
-            await self.session.writeline("  /clear - Clear screen")
+            await self.session.writeline(f"\r\n=== {self.session.t('chat.commands_title')} ===")
+            await self.session.writeline(f"  {self.session.t('chat.cmd_quit')}")
+            await self.session.writeline(f"  {self.session.t('chat.cmd_who')}")
+            await self.session.writeline(f"  {self.session.t('chat.cmd_me')}")
+            await self.session.writeline(f"  {self.session.t('chat.cmd_whisper')}")
+            await self.session.writeline(f"  {self.session.t('chat.cmd_clear')}")
             await self.session.writeline()
 
         elif cmd == "/who":
-            await self.session.writeline("\r\nUsers in room:")
+            await self.session.writeline(f"\r\n{self.session.t('chat.users_in_room')}")
             for participant in room.participants:
                 await self.session.writeline(f"  - {participant.username}")
             await self.session.writeline()
@@ -256,20 +269,21 @@ class ChatUI(UIModule[None]):
 
             for participant in room.participants:
                 if participant.username == target_username:
+                    # Use recipient's language for their message
                     await participant.writeline(
-                        f"\r[Whisper from {self.session.username}]: {whisper_msg}"
+                        f"\r{participant.t('chat.whisper_from', user=self.session.username)}: {whisper_msg}"
                     )
-                    await self.session.writeline(f"[Whisper to {target_username}]: {whisper_msg}")
+                    await self.session.writeline(f"{self.session.t('chat.whisper_sent', user=target_username)}: {whisper_msg}")
                     break
             else:
-                await self.session.writeline(f"User '{target_username}' not found in room.")
+                await self.session.writeline(self.session.t('chat.user_not_found', user=target_username))
 
         elif cmd == "/clear":
             await self.session.clear_screen()
-            await self.session.writeline(f"=== Chat Room: {room.name} ===")
+            await self.session.writeline(f"=== {self.session.t('chat.room_header', room=room.name)} ===")
             await self.session.writeline("-" * 50)
 
         else:
-            await self.session.writeline(f"Unknown command: {cmd}")
+            await self.session.writeline(self.session.t('chat.unknown_cmd', cmd=cmd))
 
         return True
