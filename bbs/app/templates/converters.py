@@ -2,93 +2,40 @@
 Character set converters for templates
 """
 import re
-from typing import Dict, Tuple
 
 
 class CharsetConverter:
     """Convert UTF-8 templates to various character encodings"""
 
-    # Box drawing character mappings
-    BOX_CHARS = {
-        'utf-8': {
-            # Single line box
-            '┌': '┌', '┐': '┐', '└': '└', '┘': '┘',
-            '─': '─', '│': '│', '├': '├', '┤': '┤',
-            '┬': '┬', '┴': '┴', '┼': '┼',
-            # Double line box
-            '╔': '╔', '╗': '╗', '╚': '╚', '╝': '╝',
-            '═': '═', '║': '║', '╠': '╠', '╣': '╣',
-            '╦': '╦', '╩': '╩', '╬': '╬',
-            # Block elements
-            '█': '█', '▄': '▄', '▀': '▀', '▌': '▌',
-            '▐': '▐', '░': '░', '▒': '▒', '▓': '▓',
-        },
-        'cp437': {
-            # Single line box - CP437 codes
-            '┌': '\xDA', '┐': '\xBF', '└': '\xC0', '┘': '\xD9',
-            '─': '\xC4', '│': '\xB3', '├': '\xC3', '┤': '\xB4',
-            '┬': '\xC2', '┴': '\xC1', '┼': '\xC5',
-            # Double line box - CP437 codes
-            '╔': '\xC9', '╗': '\xBB', '╚': '\xC8', '╝': '\xBC',
-            '═': '\xCD', '║': '\xBA', '╠': '\xCC', '╣': '\xB9',
-            '╦': '\xCB', '╩': '\xCA', '╬': '\xCE',
-            # Block elements - CP437 codes
-            '█': '\xDB', '▄': '\xDC', '▀': '\xDF', '▌': '\xDD',
-            '▐': '\xDE', '░': '\xB0', '▒': '\xB1', '▓': '\xB2',
-        },
-        'cp866': {
-            # Single line box - CP866 codes (same as CP437 for box drawing)
-            '┌': '\xDA', '┐': '\xBF', '└': '\xC0', '┘': '\xD9',
-            '─': '\xC4', '│': '\xB3', '├': '\xC3', '┤': '\xB4',
-            '┬': '\xC2', '┴': '\xC1', '┼': '\xC5',
-            # Double line box - CP866 codes
-            '╔': '\xC9', '╗': '\xBB', '╚': '\xC8', '╝': '\xBC',
-            '═': '\xCD', '║': '\xBA', '╠': '\xCC', '╣': '\xB9',
-            '╦': '\xCB', '╩': '\xCA', '╬': '\xCE',
-            # Block elements - CP866 codes
-            '█': '\xDB', '▄': '\xDC', '▀': '\xDF', '▌': '\xDD',
-            '▐': '\xDE', '░': '\xB0', '▒': '\xB1', '▓': '\xB2',
-        },
-        'x-mac-cyrillic': {
-            # MacCyrillic doesn't have box drawing, use ASCII fallback
-            '┌': '+', '┐': '+', '└': '+', '┘': '+',
-            '─': '-', '│': '|', '├': '+', '┤': '+',
-            '┬': '+', '┴': '+', '┼': '+',
-            # Double line box - ASCII fallback
-            '╔': '*', '╗': '*', '╚': '*', '╝': '*',
-            '═': '=', '║': '|', '╠': '*', '╣': '*',
-            '╦': '*', '╩': '*', '╬': '*',
-            # Block elements - ASCII fallback
-            '█': '#', '▄': '_', '▀': '^', '▌': '[',
-            '▐': ']', '░': '.', '▒': '::', '▓': '##',
-        },
-        'ascii': {
-            # Single line box - ASCII fallback
-            '┌': '+', '┐': '+', '└': '+', '┘': '+',
-            '─': '-', '│': '|', '├': '+', '┤': '+',
-            '┬': '+', '┴': '+', '┼': '+',
-            # Double line box - ASCII fallback
-            '╔': '#', '╗': '#', '╚': '#', '╝': '#',
-            '═': '=', '║': '#', '╠': '#', '╣': '#',
-            '╦': '#', '╩': '#', '╬': '#',
-            # Block elements - ASCII fallback
-            '█': '#', '▄': '_', '▀': '^', '▌': '[',
-            '▐': ']', '░': '.', '▒': 'o', '▓': 'O',
-        }
+    # ASCII fallback for box drawing characters
+    # Used for encodings that don't have native box drawing support
+    BOX_TO_ASCII = {
+        # Single line box
+        '┌': '+', '┐': '+', '└': '+', '┘': '+',
+        '─': '-', '│': '|', '├': '+', '┤': '+',
+        '┬': '+', '┴': '+', '┼': '+',
+        # Double line box
+        '╔': '+', '╗': '+', '╚': '+', '╝': '+',
+        '═': '=', '║': '|', '╠': '+', '╣': '+',
+        '╦': '+', '╩': '+', '╬': '+',
+        # Block elements
+        '█': '#', '▄': '_', '▀': '^', '▌': '[',
+        '▐': ']', '░': '.', '▒': ':', '▓': '#',
     }
 
+    # Encodings where Python codec handles box drawing natively
+    NATIVE_BOX_ENCODINGS = frozenset([
+        'utf-8', 'cp437', 'cp850', 'cp852', 'cp855', 'cp866'
+    ])
+
     # Encodings that need ASCII box char fallback (no box drawing in charset)
-    ASCII_BOX_ENCODINGS = [
+    ASCII_BOX_ENCODINGS = frozenset([
         'koi8-r', 'koi8-u', 'windows-1251', 'iso-8859-5',
         'x-mac-cyrillic', 'ascii', 'us-ascii'
-    ]
+    ])
 
     # ANSI escape sequence pattern
     ANSI_PATTERN = re.compile(r'\x1b\[[0-9;]*[mGKHJl]')
-
-    def __init__(self):
-        """Initialize charset converter"""
-        pass
 
     def convert(self, text: str, encoding: str, ansi_enabled: bool = True) -> bytes:
         """
@@ -111,16 +58,15 @@ class CharsetConverter:
 
         encoding_lower = encoding.lower()
 
-        # Convert box drawing characters based on encoding
-        # UTF-8, CP437, CP866 handle box chars natively via Python codec
-        if encoding_lower in ('utf-8', 'cp437', 'cp866') or '437' in encoding_lower or '866' in encoding_lower:
-            # These encodings have box drawing chars - Python codec handles directly
+        # Determine how to handle box drawing characters
+        if self._has_native_box_drawing(encoding_lower):
+            # Python codec handles box drawing natively - just encode
             pass
-        elif any(enc in encoding_lower for enc in self.ASCII_BOX_ENCODINGS):
-            # These encodings don't have box drawing chars, use ASCII
-            text = self._convert_box_chars(text, 'ascii')
+        elif self._needs_ascii_fallback(encoding_lower):
+            # Replace box chars with ASCII equivalents
+            text = self._replace_box_with_ascii(text)
         else:
-            # For other encodings, try to preserve what we can
+            # Unknown encoding - try to preserve what we can
             text = self._convert_box_chars_safe(text, encoding)
 
         # Encode to target charset
@@ -130,83 +76,47 @@ class CharsetConverter:
             # Unknown encoding, fall back to UTF-8
             return text.encode('utf-8', errors='replace')
 
+    def _has_native_box_drawing(self, encoding: str) -> bool:
+        """Check if encoding has native box drawing support via Python codec."""
+        if encoding in self.NATIVE_BOX_ENCODINGS:
+            return True
+        # Check for variants like 'cp866' in 'ibm866'
+        for native in self.NATIVE_BOX_ENCODINGS:
+            if native.replace('-', '') in encoding.replace('-', ''):
+                return True
+        return False
+
+    def _needs_ascii_fallback(self, encoding: str) -> bool:
+        """Check if encoding needs ASCII fallback for box drawing."""
+        for enc in self.ASCII_BOX_ENCODINGS:
+            if enc in encoding:
+                return True
+        return False
+
     def _strip_ansi(self, text: str) -> str:
-        """
-        Remove ANSI escape sequences from text
-
-        Args:
-            text: Text with ANSI codes
-
-        Returns:
-            Text without ANSI codes
-        """
+        """Remove ANSI escape sequences from text."""
         return self.ANSI_PATTERN.sub('', text)
 
-    def _convert_box_chars(self, text: str, target: str) -> str:
-        """
-        Convert UTF-8 box drawing characters to target charset
-
-        Args:
-            text: Text with UTF-8 box chars
-            target: Target charset ('cp437' or 'ascii')
-
-        Returns:
-            Text with converted box chars
-        """
-        if target not in self.BOX_CHARS:
-            return text
-
-        mappings = self.BOX_CHARS[target]
-        for utf8_char, replacement in mappings.items():
-            text = text.replace(utf8_char, replacement)
-
+    def _replace_box_with_ascii(self, text: str) -> str:
+        """Replace UTF-8 box drawing characters with ASCII equivalents."""
+        for box_char, ascii_char in self.BOX_TO_ASCII.items():
+            text = text.replace(box_char, ascii_char)
         return text
 
     def _convert_box_chars_safe(self, text: str, encoding: str) -> str:
         """
-        Safely convert box chars for unknown encodings
+        Safely convert box chars for unknown encodings.
 
-        Args:
-            text: Text with UTF-8 box chars
-            encoding: Target encoding
-
-        Returns:
-            Text with safely converted chars
+        Tries to encode each character, falls back to ASCII if it fails.
         """
-        # Try to encode each box char, fall back to ASCII if it fails
         result = []
         for char in text:
-            if char in self.BOX_CHARS['utf-8']:
+            if char in self.BOX_TO_ASCII:
                 try:
-                    # Try to encode the character
                     char.encode(encoding)
                     result.append(char)
                 except UnicodeEncodeError:
-                    # Fall back to ASCII equivalent
-                    ascii_char = self.BOX_CHARS['ascii'].get(char, '+')
-                    result.append(ascii_char)
+                    result.append(self.BOX_TO_ASCII[char])
             else:
                 result.append(char)
-
         return ''.join(result)
-
-    def _supports_extended_ascii(self, encoding: str) -> bool:
-        """
-        Check if encoding supports extended ASCII characters
-
-        Args:
-            encoding: Encoding name
-
-        Returns:
-            True if encoding supports extended ASCII
-        """
-        # Encodings that support extended ASCII/box drawing
-        extended_encodings = [
-            'cp437', 'cp850', 'cp852', 'cp855', 'cp866',
-            'iso-8859-1', 'iso-8859-2', 'iso-8859-5',
-            'windows-1250', 'windows-1251', 'windows-1252',
-            'koi8-r', 'koi8-u'
-        ]
-
-        encoding_lower = encoding.lower()
-        return any(enc in encoding_lower for enc in extended_encodings)
