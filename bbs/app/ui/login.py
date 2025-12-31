@@ -384,6 +384,9 @@ class LoginUI:
 
     async def show_motd_template(self) -> None:
         """Show MOTD using the template system"""
+        # Clear screen before showing MOTD
+        await self.session.clear_screen()
+
         # Get system stats for the template
         from ..storage.repositories import SystemRepository
         sys_repo = SystemRepository()

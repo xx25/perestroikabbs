@@ -1,42 +1,25 @@
-{# MOTD for 80x24 with ANSI colors #}
+{# MOTD for 80x24 with ANSI colors - fits in 24 lines #}
 {% extends "base/screen.j2" %}
 {% import "base/macros.j2" as macros %}
 
 {% block content %}
 {{ ansi.color(fg=6, bold=True) }}
-╔════════════════════════════════════════════════════════════════════════════╗
-║                                                                            ║
-║  ██████╗ ███████╗██████╗ ███████╗███████╗████████╗██████╗  ██████╗ ██╗  ║
-║  ██╔══██╗██╔════╝██╔══██╗██╔════╝██╔════╝╚══██╔══╝██╔══██╗██╔═══██╗██║  ║
-║  ██████╔╝█████╗  ██████╔╝█████╗  ███████╗   ██║   ██████╔╝██║   ██║█╔╝  ║
-║  ██╔═══╝ ██╔══╝  ██╔══██╗██╔══╝  ╚════██║   ██║   ██╔══██╗██║   ██║██╗  ║
-║  ██║     ███████╗██║  ██║███████╗███████║   ██║   ██║  ██║╚██████╔╝██║  ║
-║  ╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ║
-║                                                                            ║
-║                         B B S   S Y S T E M                               ║
-║                                                                            ║
-╚════════════════════════════════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════════════════════════╗
+║  ██████╗ ███████╗██████╗ ███████╗███████╗████████╗██████╗  ██████╗ ██╗ ║
+║  ██╔══██╗██╔════╝██╔══██╗██╔════╝██╔════╝╚══██╔══╝██╔══██╗██╔═══██╗██║ ║
+║  ██████╔╝█████╗  ██████╔╝█████╗  ███████╗   ██║   ██████╔╝██║   ██║█╔╝ ║
+║  ██╔═══╝ ██╔══╝  ██╔══██╗██╔══╝  ╚════██║   ██║   ██╔══██╗██║   ██║██╗ ║
+║  ██║     ███████╗██║  ██║███████╗███████║   ██║   ██║  ██║╚██████╔╝██║ ║
+║  ╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝ ╚═╝ ║
+╚══════════════════════════════════════════════════════════════════════════╝
 {{ ansi.reset() }}
+{{ ansi.color(fg=3, bold=True) }}Welcome, {{ username }}!{{ ansi.reset() }}  {{ ansi.color(fg=7) }}Last login: {{ last_login|default("First Visit") }}{{ ansi.reset() }}
 
-{{ ansi.color(fg=3, bold=True) }}Welcome back, {{ username }}!{{ ansi.reset() }}
-
-{{ ansi.color(fg=7) }}System Statistics:{{ ansi.reset() }}
-  Total Users: {{ ansi.color(fg=2) }}{{ total_users|default(0)|rjust(5) }}{{ ansi.reset() }}    Messages Today: {{ ansi.color(fg=2) }}{{ messages_today|default(0)|rjust(4) }}{{ ansi.reset() }}
-  Online Now:  {{ ansi.color(fg=2) }}{{ online_now|default(0)|rjust(5) }}{{ ansi.reset() }}    Files Shared:   {{ ansi.color(fg=2) }}{{ files_shared|default(0)|rjust(4) }}{{ ansi.reset() }}
-
-{{ ansi.color(fg=6) }}Your Status:{{ ansi.reset() }}
-  Last Login:    {{ last_login|default("First Visit") }}
-  Access Level:  {{ access_level|default(1) }}
-  Unread Mail:   {{ ansi.color(fg=1, bold=True) if unread_mail }}{{ unread_mail|default(0) }}{{ ansi.reset() }} message(s)
-
+{{ ansi.color(fg=7) }}Stats:{{ ansi.reset() }} Users: {{ ansi.color(fg=2) }}{{ total_users|default(0) }}{{ ansi.reset() }}  Online: {{ ansi.color(fg=2) }}{{ online_now|default(0) }}{{ ansi.reset() }}  Mail: {{ ansi.color(fg=1, bold=True) if unread_mail }}{{ unread_mail|default(0) }}{{ ansi.reset() }}  Level: {{ access_level|default(0) }}
 {% if system_news %}
-{{ ansi.color(fg=5, bold=True) }}═══════════════════════ System News ═══════════════════════{{ ansi.reset() }}
-{{ system_news|wordwrap(76) }}
+{{ ansi.color(fg=5, bold=True) }}─────────────────────────── News ───────────────────────────{{ ansi.reset() }}
+{{ system_news|truncate(150)|wordwrap(76) }}
 {% endif %}
 
-{% if is_birthday %}
-{{ ansi.color(fg=3, bold=True, blink=True) }}★ ☆ ★ HAPPY BIRTHDAY! ★ ☆ ★{{ ansi.reset() }}
-{% endif %}
-
-{{ ansi.color(fg=7) }}{{ macros.press_any_key(80) }}{{ ansi.reset() }}
+{{ ansi.color(fg=7) }}{{ macros.press_any_key(78) }}{{ ansi.reset() }}
 {% endblock %}
