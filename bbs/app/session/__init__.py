@@ -290,3 +290,15 @@ class Session:
                 logger.info(f"Session {self.id}: Suggesting Russian-compatible encoding")
             return True
         return False
+
+    # === Hashability for use in sets/dicts ===
+
+    def __hash__(self) -> int:
+        """Hash by session ID for use in sets and as dict keys."""
+        return hash(self.id)
+
+    def __eq__(self, other: object) -> bool:
+        """Compare sessions by ID."""
+        if not isinstance(other, Session):
+            return NotImplemented
+        return self.id == other.id

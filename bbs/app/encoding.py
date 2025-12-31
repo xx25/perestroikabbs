@@ -44,6 +44,7 @@ class CharsetManager:
         ("ISO-8859-5 (Cyrillic)", "iso-8859-5"),
         ("ISO-8859-7 (Greek)", "iso-8859-7"),
         ("KOI8-R (Russian)", "koi8-r"),
+        ("KOI8-U (Ukrainian)", "koi8-u"),
         ("Windows-1251 (Cyrillic)", "windows-1251"),
         ("Windows-1252 (Western)", "windows-1252"),
         ("MacRoman", "macintosh"),
