@@ -94,10 +94,7 @@
     "title": "=== Настройки ===",
     "change_password": "Изменить пароль",
     "change_email": "Изменить email",
-    "language_settings": "Языковые настройки",
-    "view_profile": "Просмотр профиля",
-    "current_language": "Текущий язык: {language}",
-    "change_language": "Изменить язык интерфейса"
+    "view_profile": "Просмотр профиля"
   },
   "users": {
     "title": "Список пользователей",

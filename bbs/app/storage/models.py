@@ -30,7 +30,6 @@ class User(Base):
     location = Column(String(100), nullable=True)
     access_level = Column(Integer, default=1, nullable=False)
     status = Column(SQLEnum(UserStatus), default=UserStatus.ACTIVE, nullable=False)
-    language_pref = Column(String(5), default="en")
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     last_login_at = Column(DateTime, nullable=True)
     login_count = Column(Integer, default=0)

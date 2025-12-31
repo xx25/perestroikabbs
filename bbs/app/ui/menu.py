@@ -204,8 +204,7 @@ class MainMenu(Menu):
         settings_menu = Menu(self.session, self.session.t('settings.title'))
         settings_menu.add_item("1", self.session.t('settings.change_password'), self.change_password)
         settings_menu.add_item("2", self.session.t('settings.change_email'), self.change_email)
-        settings_menu.add_item("3", self.session.t('settings.language_settings'), self.language_settings)
-        settings_menu.add_item("4", self.session.t('settings.view_profile'), self.view_profile)
+        settings_menu.add_item("3", self.session.t('settings.view_profile'), self.view_profile)
         settings_menu.add_item("Q", self.session.t('common.back'), lambda: setattr(settings_menu, "running", False))
 
         await settings_menu.run()
@@ -242,45 +241,6 @@ class MainMenu(Menu):
             await self.session.writeline("\r\nEmail not changed.")
 
         await self.session.writeline("\r\nPress any key to continue...")
-        await self.session.read(1)
-
-    async def language_settings(self) -> None:
-        """Allow user to change interface language"""
-        await self.session.clear_screen()
-        await self.session.writeline(self.session.t('settings.language_settings'))
-        await self.session.writeline()
-
-        current_lang = 'English' if self.session.language == 'en' else 'Русский'
-        await self.session.writeline(self.session.t('settings.current_language', language=current_lang))
-        await self.session.writeline()
-
-        await self.session.writeline("1. English")
-        await self.session.writeline("2. Русский (Russian)")
-        await self.session.writeline(f"0. {self.session.t('common.back')}")
-
-        choice = await self.session.readline(f"\r\n{self.session.t('login.your_choice')}: ")
-
-        if choice == "1":
-            self.session.set_language('en')
-            await self.session.writeline("\r\nLanguage changed to English")
-        elif choice == "2":
-            self.session.set_language('ru')
-            await self.session.writeline("\r\nЯзык изменен на русский")
-
-        # Save preference if logged in
-        if choice in ["1", "2"] and self.session.user_id:
-            from ..storage.db import get_session
-            from sqlalchemy import update
-            from ..storage.models import User
-            async with get_session() as db_session:
-                await db_session.execute(
-                    update(User)
-                    .where(User.id == self.session.user_id)
-                    .values(language_pref=self.session.language)
-                )
-                await db_session.commit()
-            await self.session.writeline(self.session.t('settings.settings_saved'))
-
         await self.session.read(1)
 
     async def view_profile(self) -> None:

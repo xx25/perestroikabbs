@@ -94,10 +94,7 @@
     "title": "=== Settings ===",
     "change_password": "Change Password",
     "change_email": "Change Email",
-    "language_settings": "Language Settings",
-    "view_profile": "View Profile",
-    "current_language": "Current language: {language}",
-    "change_language": "Change interface language"
+    "view_profile": "View Profile"
   },
   "users": {
     "title": "User List",
