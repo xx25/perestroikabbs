@@ -200,12 +200,12 @@ class LoginUI:
     async def login(self) -> bool:
         for attempt in range(self.max_attempts):
             await self.session.writeline()
-            username = await self.session.readline("Username: ")
+            username = await self.session.readline(f"{self.session.t('login.username_prompt')}: ")
 
             if not username:
                 continue
 
-            password = await self.session.read_password("Password: ")
+            password = await self.session.read_password(f"{self.session.t('login.password_prompt')}: ")
 
             user = await self.user_repo.get_by_username(username)
 
@@ -216,7 +216,7 @@ class LoginUI:
                 if not valid:
                     await self.session.writeline(f"\r\n{self.session.t('login.invalid_credentials')}")
                     if attempt < self.max_attempts - 1:
-                        await self.session.writeline(f"Attempts remaining: {self.max_attempts - attempt - 1}")
+                        await self.session.writeline(self.session.t('login.attempts_remaining', count=self.max_attempts - attempt - 1))
                     await asyncio.sleep(1)
                     continue
 
@@ -233,14 +233,15 @@ class LoginUI:
                 # Ask if user wants to use saved preferences
                 await self.session.writeline()
                 if user.encoding_pref or (user.terminal_cols and user.terminal_rows):
-                    await self.session.writeline("Your saved preferences:")
+                    await self.session.writeline(self.session.t('login.saved_preferences'))
                     if user.encoding_pref:
-                        await self.session.writeline(f"  Encoding: {user.encoding_pref}")
+                        await self.session.writeline(f"  {self.session.t('login.pref_encoding', encoding=user.encoding_pref)}")
                     if user.terminal_cols and user.terminal_rows:
-                        await self.session.writeline(f"  Terminal: {user.terminal_cols}x{user.terminal_rows}")
+                        await self.session.writeline(f"  {self.session.t('login.pref_terminal', cols=user.terminal_cols, rows=user.terminal_rows)}")
 
-                    use_saved = await self.session.readline("\r\nUse saved preferences? (Y/N) [Y]: ")
-                    if use_saved.upper() != 'N':
+                    use_saved = await self.session.readline(f"\r\n{self.session.t('login.use_saved_prefs')}: ")
+                    # Accept Y/Д for yes (Russian Д = Da = Yes)
+                    if use_saved.upper() not in ('N', 'Н'):
                         if user.encoding_pref:
                             self.session.set_encoding(user.encoding_pref)
                         if user.terminal_cols and user.terminal_rows:
@@ -254,7 +255,7 @@ class LoginUI:
             else:
                 await self.session.writeline(f"\r\n{self.session.t('login.invalid_credentials')}")
                 if attempt < self.max_attempts - 1:
-                    await self.session.writeline(f"Attempts remaining: {self.max_attempts - attempt - 1}")
+                    await self.session.writeline(self.session.t('login.attempts_remaining', count=self.max_attempts - attempt - 1))
                 await asyncio.sleep(1)
 
         await self.session.writeline(f"\r\n{self.session.t('login.max_attempts')}")
@@ -262,45 +263,45 @@ class LoginUI:
 
     async def register(self) -> bool:
         await self.session.writeline()
-        await self.session.writeline("=== New User Registration ===")
+        await self.session.writeline(self.session.t('register.title'))
         await self.session.writeline()
 
         while True:
-            username = await self.session.readline("Choose a username (3-20 chars): ")
+            username = await self.session.readline(f"{self.session.t('register.username_prompt')}: ")
 
             if len(username) < 3:
-                await self.session.writeline("Username too short.")
+                await self.session.writeline(self.session.t('register.username_short'))
                 continue
 
             if len(username) > 20:
-                await self.session.writeline("Username too long.")
+                await self.session.writeline(self.session.t('register.username_long'))
                 continue
 
             if await self.user_repo.get_by_username(username):
-                await self.session.writeline("Username already taken.")
+                await self.session.writeline(self.session.t('register.username_taken'))
                 continue
 
             break
 
         while True:
-            password = await self.session.read_password("Choose a password (min 8 chars): ")
+            password = await self.session.read_password(f"{self.session.t('register.password_prompt')}: ")
 
             if len(password) < 8:
-                await self.session.writeline("\r\nPassword too short.")
+                await self.session.writeline(f"\r\n{self.session.t('register.password_short')}")
                 continue
 
-            confirm = await self.session.read_password("Confirm password: ")
+            confirm = await self.session.read_password(f"{self.session.t('register.password_confirm')}: ")
 
             if password != confirm:
-                await self.session.writeline("\r\nPasswords don't match.")
+                await self.session.writeline(f"\r\n{self.session.t('register.password_mismatch')}")
                 continue
 
             break
 
         await self.session.writeline()
-        email = await self.session.readline("Email (optional): ")
-        real_name = await self.session.readline("Real name (optional): ")
-        location = await self.session.readline("Location (optional): ")
+        email = await self.session.readline(f"{self.session.t('register.email_prompt')}: ")
+        real_name = await self.session.readline(f"{self.session.t('register.realname_prompt')}: ")
+        location = await self.session.readline(f"{self.session.t('register.location_prompt')}: ")
 
         # Save terminal preferences
         encoding_pref = self.session.capabilities.encoding
