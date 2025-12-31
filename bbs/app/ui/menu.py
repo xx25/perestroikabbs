@@ -180,24 +180,24 @@ class MainMenu(Menu):
 
     async def system_stats(self) -> None:
         await self.session.clear_screen()
-        await self.session.writeline("=== System Statistics ===")
+        await self.session.writeline(f"=== {self.session.t('admin.system_stats')} ===")
         await self.session.writeline()
 
         from ..storage.repositories import SystemRepository
         sys_repo = SystemRepository()
         stats = await sys_repo.get_stats()
 
-        await self.session.writeline(f"Total Users:     {stats.get('total_users', 0)}")
-        await self.session.writeline(f"Active Sessions: {stats.get('active_sessions', 0)}")
-        await self.session.writeline(f"Total Posts:     {stats.get('total_posts', 0)}")
-        await self.session.writeline(f"Total Files:     {stats.get('total_files', 0)}")
-        await self.session.writeline(f"Total Downloads: {stats.get('total_downloads', 0)}")
+        await self.session.writeline(self.session.t('admin.total_users', count=stats.get('total_users', 0)))
+        await self.session.writeline(self.session.t('admin.active_sessions', count=stats.get('active_sessions', 0)))
+        await self.session.writeline(self.session.t('admin.total_posts', count=stats.get('total_posts', 0)))
+        await self.session.writeline(self.session.t('admin.total_files', count=stats.get('total_files', 0)))
+        await self.session.writeline(self.session.t('admin.total_downloads', count=stats.get('total_downloads', 0)))
         await self.session.writeline()
-        await self.session.writeline(f"System Uptime:   {stats.get('uptime', 'Unknown')}")
-        await self.session.writeline(f"BBS Version:     {stats.get('version', '0.1.0')}")
+        await self.session.writeline(self.session.t('admin.uptime', time=stats.get('uptime', '?')))
+        await self.session.writeline(self.session.t('admin.version', version=stats.get('version', '0.1.0')))
 
         await self.session.writeline()
-        await self.session.writeline("Press any key to continue...")
+        await self.session.writeline(self.session.t('common.continue'))
         await self.session.read(1)
 
     async def personal_settings(self) -> None:

@@ -210,6 +210,7 @@
     "active_sessions": "Активных сеансов: {count}",
     "total_posts": "Всего сообщений: {count}",
     "total_files": "Всего файлов: {count}",
+    "total_downloads": "Всего загрузок: {count}",
     "storage_used": "Использовано места: {size}",
     "db_size": "Размер базы данных: {size}",
     "uptime": "Время работы системы: {time}",

@@ -209,6 +209,7 @@
     "active_sessions": "Active Sessions: {count}",
     "total_posts": "Total Posts: {count}",
     "total_files": "Total Files: {count}",
+    "total_downloads": "Total Downloads: {count}",
     "storage_used": "Storage Used: {size}",
     "db_size": "Database Size: {size}",
     "uptime": "System Uptime: {time}",
