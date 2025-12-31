@@ -8,7 +8,7 @@ set -e
 REMOTE_HOST="192.168.91.2"
 REMOTE_USER="${DEPLOY_USER:-dp}"
 REMOTE_PATH="/opt/perestroika-bbs"
-COMPOSE_FILE="docker-compose.prod.yml"
+COMPOSE_FILE="docker-compose.external-db.yml"
 
 # Colors
 RED='\033[0;31m'
@@ -21,20 +21,21 @@ usage() {
     echo "Usage: $0 [command]"
     echo ""
     echo "Commands:"
-    echo "  init      - First-time server setup (create dirs, secrets, check Docker)"
-    echo "  deploy    - Full deploy (sync + rebuild + restart)"
-    echo "  sync      - Sync files only (no restart)"
-    echo "  restart   - Restart containers only"
-    echo "  stop      - Stop all containers"
-    echo "  logs      - View remote logs"
-    echo "  status    - Check remote status"
-    echo "  shell     - SSH into remote server"
-    echo "  migrate   - Run database migrations"
+    echo "  init        - First-time server setup (create dirs, configure MySQL)"
+    echo "  deploy      - Full deploy (sync + rebuild + restart)"
+    echo "  sync        - Sync files only (no restart)"
+    echo "  restart     - Restart containers only"
+    echo "  stop        - Stop all containers"
+    echo "  logs        - View remote logs"
+    echo "  status      - Check remote status"
+    echo "  shell       - SSH into remote server"
+    echo "  migrate     - Run database migrations"
+    echo "  config-db   - Reconfigure MySQL connection settings"
     echo "  create-admin - Create admin user (after first deploy)"
     echo ""
-    echo "First-time deployment:"
-    echo "  1. $0 init"
-    echo "  2. $0 deploy"
+    echo "First-time deployment (uses existing remote MySQL):"
+    echo "  1. $0 init        # Configure remote MySQL connection"
+    echo "  2. $0 deploy      # Deploy BBS container"
     echo "  3. $0 create-admin"
     echo ""
     echo "Environment variables:"
@@ -91,22 +92,43 @@ init_server() {
     ssh "${REMOTE_USER}@${REMOTE_HOST}" "sudo mkdir -p ${REMOTE_PATH} && sudo chown ${REMOTE_USER}:${REMOTE_USER} ${REMOTE_PATH}"
     success "Directory created"
 
-    # Create secrets
-    log "Setting up secrets..."
+    # Configure external MySQL connection
+    log "Setting up external MySQL connection..."
 
     echo ""
-    echo -e "${YELLOW}Enter MySQL passwords for production:${NC}"
-    read -p "MySQL ROOT password: " -s MYSQL_ROOT_PASS
-    echo ""
-    read -p "MySQL BBS user password: " -s MYSQL_BBS_PASS
+    echo -e "${YELLOW}Enter remote MySQL server details:${NC}"
+    read -p "MySQL host [localhost]: " DB_HOST
+    DB_HOST=${DB_HOST:-localhost}
+    read -p "MySQL port [3306]: " DB_PORT
+    DB_PORT=${DB_PORT:-3306}
+    read -p "MySQL database name [perestroika_bbs]: " DB_NAME
+    DB_NAME=${DB_NAME:-perestroika_bbs}
+    read -p "MySQL username: " DB_USER
+    read -p "MySQL password: " -s DB_PASSWORD
     echo ""
     echo ""
 
-    ssh "${REMOTE_USER}@${REMOTE_HOST}" "mkdir -p ${REMOTE_PATH}/secrets && chmod 700 ${REMOTE_PATH}/secrets"
-    ssh "${REMOTE_USER}@${REMOTE_HOST}" "echo '${MYSQL_ROOT_PASS}' > ${REMOTE_PATH}/secrets/mysql_root_password.txt"
-    ssh "${REMOTE_USER}@${REMOTE_HOST}" "echo '${MYSQL_BBS_PASS}' > ${REMOTE_PATH}/secrets/mysql_password.txt"
-    ssh "${REMOTE_USER}@${REMOTE_HOST}" "chmod 600 ${REMOTE_PATH}/secrets/*.txt"
-    success "Secrets created"
+    # Create .env file with database credentials
+    log "Creating environment file..."
+    ssh "${REMOTE_USER}@${REMOTE_HOST}" "cat > ${REMOTE_PATH}/.env << 'ENVEOF'
+DB_HOST=${DB_HOST}
+DB_PORT=${DB_PORT}
+DB_NAME=${DB_NAME}
+DB_USER=${DB_USER}
+DB_PASSWORD=${DB_PASSWORD}
+ENVEOF"
+    ssh "${REMOTE_USER}@${REMOTE_HOST}" "chmod 600 ${REMOTE_PATH}/.env"
+    success "Environment file created"
+
+    # Test MySQL connection
+    log "Testing MySQL connection..."
+    if ssh "${REMOTE_USER}@${REMOTE_HOST}" "mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p'${DB_PASSWORD}' -e 'SELECT 1' ${DB_NAME} > /dev/null 2>&1"; then
+        success "MySQL connection successful"
+    else
+        warn "Could not connect to MySQL. Please verify credentials and ensure database exists."
+        echo -e "${YELLOW}You may need to create the database manually:${NC}"
+        echo "  CREATE DATABASE ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    fi
 
     echo
     echo -e "${GREEN}╔══════════════════════════════════════════════╗${NC}"
@@ -179,6 +201,103 @@ remote_exec() {
     ssh "${REMOTE_USER}@${REMOTE_HOST}" "cd ${REMOTE_PATH} && $1"
 }
 
+# Reconfigure database connection
+config_db() {
+    log "Reconfiguring MySQL connection..."
+
+    echo ""
+    echo -e "${YELLOW}Enter remote MySQL server details:${NC}"
+    read -p "MySQL host [localhost]: " DB_HOST
+    DB_HOST=${DB_HOST:-localhost}
+    read -p "MySQL port [3306]: " DB_PORT
+    DB_PORT=${DB_PORT:-3306}
+    read -p "MySQL database name [perestroika_bbs]: " DB_NAME
+    DB_NAME=${DB_NAME:-perestroika_bbs}
+    read -p "MySQL username: " DB_USER
+    read -p "MySQL password: " -s DB_PASSWORD
+    echo ""
+    echo ""
+
+    # Update .env file
+    log "Updating environment file..."
+    ssh "${REMOTE_USER}@${REMOTE_HOST}" "cat > ${REMOTE_PATH}/.env << ENVEOF
+DB_HOST=${DB_HOST}
+DB_PORT=${DB_PORT}
+DB_NAME=${DB_NAME}
+DB_USER=${DB_USER}
+DB_PASSWORD=${DB_PASSWORD}
+ENVEOF"
+    ssh "${REMOTE_USER}@${REMOTE_HOST}" "chmod 600 ${REMOTE_PATH}/.env"
+    success "Environment file updated"
+
+    # Regenerate config and restart
+    generate_config
+
+    log "Restarting BBS..."
+    remote_exec "docker compose -f ${COMPOSE_FILE} restart"
+    success "BBS restarted with new database configuration"
+}
+
+# Generate config.toml from .env file
+generate_config() {
+    log "Generating config.toml from environment..."
+
+    # Read database credentials from .env and generate config
+    ssh "${REMOTE_USER}@${REMOTE_HOST}" "cd ${REMOTE_PATH} && source .env && cat > config.toml << CONFIGEOF
+[server]
+host = \"0.0.0.0\"
+port = 2323
+motd_asset = \"ansi/motd.ans\"
+max_connections = 100
+connection_timeout = 300
+welcome_message = \"Welcome to Perestroika BBS!\"
+
+[telnet]
+enable_naws = true
+enable_binary = true
+enable_echo = false
+default_cols = 80
+default_rows = 24
+
+[db]
+dsn = \"mysql+aiomysql://\${DB_USER}:\${DB_PASSWORD}@\${DB_HOST}:\${DB_PORT}/\${DB_NAME}\"
+echo = false
+pool_size = 20
+max_overflow = 10
+pool_timeout = 30
+pool_recycle = 3600
+
+[transfers]
+rz_path = \"/usr/bin/rz\"
+sz_path = \"/usr/bin/sz\"
+ckermit_path = \"/usr/bin/kermit\"
+download_root = \"/var/lib/bbs/files\"
+upload_root = \"/var/lib/bbs/uploads\"
+max_upload_size = 10485760
+
+[security]
+argon2_time_cost = 3
+argon2_memory_cost = 65536
+argon2_parallelism = 4
+max_login_attempts = 5
+login_throttle_seconds = 60
+session_timeout = 3600
+require_secure_passwords = true
+min_password_length = 8
+
+[charset]
+default_encoding = \"utf-8\"
+supported_encodings = [\"utf-8\", \"cp437\", \"iso-8859-1\", \"koi8-r\", \"windows-1251\"]
+
+[logging]
+level = \"INFO\"
+file_path = \"/var/log/bbs/perestroika.log\"
+max_bytes = 10485760
+backup_count = 5
+CONFIGEOF"
+    success "Config generated"
+}
+
 # Full deployment
 deploy() {
     echo -e "${BLUE}╔══════════════════════════════════════════════╗${NC}"
@@ -187,7 +306,15 @@ deploy() {
     echo -e "${BLUE}╚══════════════════════════════════════════════╝${NC}"
     echo
 
+    # Check if .env exists
+    if ! ssh "${REMOTE_USER}@${REMOTE_HOST}" "test -f ${REMOTE_PATH}/.env"; then
+        error "No .env file found. Run '$0 init' first."
+    fi
+
     sync_files
+
+    # Generate config.toml from .env
+    generate_config
 
     log "Building Docker image..."
     remote_exec "docker compose -f ${COMPOSE_FILE} build"
@@ -245,6 +372,9 @@ case "${1:-help}" in
         log "Running migrations..."
         remote_exec "docker compose -f ${COMPOSE_FILE} exec -T bbs python -m alembic upgrade head"
         success "Migrations complete"
+        ;;
+    config-db)
+        config_db
         ;;
     create-admin)
         create_admin

@@ -1,0 +1,52 @@
+version: '3.8'
+
+# Docker Compose for Perestroika BBS with external MySQL server
+# Use this when MySQL is already running on a remote/host server
+
+services:
+  bbs:
+    build: .
+    image: perestroika-bbs:latest
+    container_name: perestroika-bbs
+    ports:
+      - "2323:2323"
+    environment:
+      - BBS_DB_HOST=${DB_HOST:-host.docker.internal}
+      - BBS_DB_PORT=${DB_PORT:-3306}
+      - BBS_DB_USER=${DB_USER:-bbs}
+      - BBS_DB_NAME=${DB_NAME:-perestroika_bbs}
+      - BBS_DB_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - ./config.toml:/app/config.toml:ro
+      - bbs_files:/var/lib/bbs/files
+      - bbs_uploads:/var/lib/bbs/uploads
+      - bbs_logs:/var/log/bbs
+      - ./bbs/app/assets:/app/bbs/app/assets:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost', 2323)); s.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  bbs_files:
+    driver: local
+  bbs_uploads:
+    driver: local
+  bbs_logs:
+    driver: local
