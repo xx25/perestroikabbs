@@ -287,7 +287,7 @@ min_password_length = 8
 
 [charset]
 default_encoding = \"utf-8\"
-supported_encodings = [\"utf-8\", \"cp437\", \"iso-8859-1\", \"koi8-r\", \"windows-1251\"]
+supported_encodings = [\"utf-8\", \"ascii\", \"cp866\", \"koi8-r\", \"koi8-u\", \"windows-1251\", \"iso-8859-5\", \"x-mac-cyrillic\"]
 
 [logging]
 level = \"INFO\"

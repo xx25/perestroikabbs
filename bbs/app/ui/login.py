@@ -120,7 +120,6 @@ class LoginUI:
             await self.session.writeline(f" [{i}] {short_display}")
 
         await self.session.writeline(f" [0] Auto-detect")
-        await self.session.writeline(f" [7] 7-bit ASCII only")
 
         while True:
             choice = await self.session.readline("Choice: ")
@@ -139,17 +138,14 @@ class LoginUI:
                         await self.session.writeline("Please select your encoding manually.")
                         continue
 
-                elif idx == 7:
-                    # 7-bit ASCII mode
-                    self.session.capabilities.seven_bit = True
-                    self.session.capabilities.ansi = False
-                    self.session.capabilities.color = False
-                    self.session.set_encoding("ascii")
-                    await self.session.writeline("7-bit ASCII mode enabled")
-                    break
                 elif 1 <= idx <= len(encodings):
                     encoding = encodings[idx - 1][1]
                     self.session.set_encoding(encoding)
+                    # Special handling for ASCII mode
+                    if encoding == "ascii":
+                        self.session.capabilities.seven_bit = True
+                        self.session.capabilities.ansi = False
+                        self.session.capabilities.color = False
                     await self.session.writeline(f"Encoding set to {encodings[idx - 1][0]}")
                     break
                 else:

@@ -37,19 +37,13 @@ class CodecIO:
 class CharsetManager:
     COMMON_ENCODINGS = [
         ("UTF-8", "utf-8"),
-        ("CP437 (DOS)", "cp437"),
-        ("CP866 (DOS Russian)", "cp866"),
-        ("ISO-8859-1 (Latin-1)", "iso-8859-1"),
-        ("ISO-8859-2 (Central European)", "iso-8859-2"),
-        ("ISO-8859-5 (Cyrillic)", "iso-8859-5"),
-        ("ISO-8859-7 (Greek)", "iso-8859-7"),
+        ("7-bit ASCII", "ascii"),
+        ("CP866 (DOS Cyrillic)", "cp866"),
         ("KOI8-R (Russian)", "koi8-r"),
         ("KOI8-U (Ukrainian)", "koi8-u"),
         ("Windows-1251 (Cyrillic)", "windows-1251"),
-        ("Windows-1252 (Western)", "windows-1252"),
-        ("MacRoman", "macintosh"),
+        ("ISO-8859-5 (Cyrillic)", "iso-8859-5"),
         ("MacCyrillic", "x-mac-cyrillic"),
-        ("Shift_JIS (Japanese)", "shift_jis"),
     ]
 
     CP437_MAPPING = {

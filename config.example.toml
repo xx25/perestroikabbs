@@ -44,19 +44,13 @@ min_password_length = 8
 default_encoding = "utf-8"
 supported_encodings = [
     "utf-8",
-    "cp437",
+    "ascii",
     "cp866",
-    "iso-8859-1",
-    "iso-8859-2",
-    "iso-8859-5",
-    "iso-8859-7",
     "koi8-r",
     "koi8-u",
     "windows-1251",
-    "windows-1252",
-    "macintosh",
-    "x-mac-cyrillic",
-    "shift_jis"
+    "iso-8859-5",
+    "x-mac-cyrillic"
 ]
 
 [language]
