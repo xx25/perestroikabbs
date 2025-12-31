@@ -204,9 +204,8 @@ class MainMenu(Menu):
         settings_menu = Menu(self.session, self.session.t('settings.title'))
         settings_menu.add_item("1", self.session.t('settings.change_password'), self.change_password)
         settings_menu.add_item("2", self.session.t('settings.change_email'), self.change_email)
-        settings_menu.add_item("3", self.session.t('settings.terminal_settings'), self.terminal_settings)
-        settings_menu.add_item("4", self.session.t('settings.language_settings'), self.language_settings)
-        settings_menu.add_item("5", self.session.t('settings.view_profile'), self.view_profile)
+        settings_menu.add_item("3", self.session.t('settings.language_settings'), self.language_settings)
+        settings_menu.add_item("4", self.session.t('settings.view_profile'), self.view_profile)
         settings_menu.add_item("Q", self.session.t('common.back'), lambda: setattr(settings_menu, "running", False))
 
         await settings_menu.run()
@@ -244,139 +243,6 @@ class MainMenu(Menu):
 
         await self.session.writeline("\r\nPress any key to continue...")
         await self.session.read(1)
-
-    async def terminal_settings(self) -> None:
-        await self.session.clear_screen()
-        await self.session.writeline("=== Terminal Settings ===")
-        await self.session.writeline()
-        await self.session.writeline(f"Current encoding: {self.session.capabilities.encoding}")
-        await self.session.writeline(f"Terminal size:    {self.session.capabilities.cols}x{self.session.capabilities.rows}")
-        await self.session.writeline(f"ANSI support:     {'Yes' if self.session.capabilities.ansi else 'No'}")
-        await self.session.writeline(f"Color support:    {'Yes' if self.session.capabilities.color else 'No'}")
-        await self.session.writeline(f"RIPscrip support: {'Yes' if self.session.capabilities.ripscrip else 'No'}")
-
-        await self.session.writeline()
-        await self.session.writeline("Options:")
-        await self.session.writeline("1. Change terminal size")
-        await self.session.writeline("2. Change encoding")
-        await self.session.writeline("3. Toggle ANSI colors")
-        await self.session.writeline("4. Save current settings as default")
-        await self.session.writeline("0. Back")
-
-        choice = await self.session.readline("\r\nChoice: ")
-
-        if choice == "1":
-            await self._change_terminal_size()
-        elif choice == "2":
-            await self._change_encoding()
-        elif choice == "3":
-            await self._toggle_ansi()
-        elif choice == "4":
-            await self._save_terminal_defaults()
-
-        # Show settings again if something was changed
-        if choice in ["1", "2", "3", "4"]:
-            await self.terminal_settings()  # Recursive call to show updated settings
-
-    async def _change_terminal_size(self) -> None:
-        """Change terminal size settings"""
-        await self.session.writeline()
-        await self.session.writeline("Select terminal size:")
-        await self.session.writeline("1. 80x24  (Standard)")
-        await self.session.writeline("2. 80x25  (DOS/PC)")
-        await self.session.writeline("3. 80x43  (EGA)")
-        await self.session.writeline("4. 80x50  (VGA)")
-        await self.session.writeline("5. 132x24 (VT100 wide)")
-        await self.session.writeline("6. Custom")
-        await self.session.writeline("0. Cancel")
-
-        choice = await self.session.readline("\r\nChoice: ")
-
-        size_map = {
-            "1": (80, 24),
-            "2": (80, 25),
-            "3": (80, 43),
-            "4": (80, 50),
-            "5": (132, 24)
-        }
-
-        if choice in size_map:
-            cols, rows = size_map[choice]
-            self.session.capabilities.cols = cols
-            self.session.capabilities.rows = rows
-            await self.session.writeline(f"\r\nTerminal size changed to {cols}x{rows}")
-        elif choice == "6":
-            cols_str = await self.session.readline("\r\nColumns (40-255): ")
-            rows_str = await self.session.readline("Rows (20-100): ")
-            try:
-                cols = int(cols_str)
-                rows = int(rows_str)
-                if 40 <= cols <= 255 and 20 <= rows <= 100:
-                    self.session.capabilities.cols = cols
-                    self.session.capabilities.rows = rows
-                    await self.session.writeline(f"\r\nTerminal size changed to {cols}x{rows}")
-                else:
-                    await self.session.writeline("\r\nInvalid size range")
-            except ValueError:
-                await self.session.writeline("\r\nInvalid input")
-
-    async def _change_encoding(self) -> None:
-        """Change character encoding"""
-        await self.session.writeline()
-        await self.session.writeline("Select encoding:")
-        await self.session.writeline("1. UTF-8 (Unicode)")
-        await self.session.writeline("2. CP437 (DOS/ANSI art)")
-        await self.session.writeline("3. ISO-8859-1 (Latin-1)")
-        await self.session.writeline("4. Windows-1252")
-        await self.session.writeline("5. KOI8-R (Russian)")
-        await self.session.writeline("6. ASCII (7-bit)")
-        await self.session.writeline("0. Cancel")
-
-        choice = await self.session.readline("\r\nChoice: ")
-
-        encoding_map = {
-            "1": "utf-8",
-            "2": "cp437",
-            "3": "iso-8859-1",
-            "4": "windows-1252",
-            "5": "koi8-r",
-            "6": "ascii"
-        }
-
-        if choice in encoding_map:
-            encoding = encoding_map[choice]
-            self.session.set_encoding(encoding)
-            if encoding == "ascii":
-                self.session.capabilities.seven_bit = True
-            else:
-                self.session.capabilities.seven_bit = False
-            await self.session.writeline(f"\r\nEncoding changed to {encoding}")
-
-    async def _toggle_ansi(self) -> None:
-        """Toggle ANSI color support"""
-        self.session.capabilities.ansi = not self.session.capabilities.ansi
-        self.session.capabilities.color = self.session.capabilities.ansi
-        status = "enabled" if self.session.capabilities.ansi else "disabled"
-        await self.session.writeline(f"\r\nANSI colors {status}")
-
-    async def _save_terminal_defaults(self) -> None:
-        """Save current terminal settings as user defaults"""
-        if not self.session.user_id:
-            await self.session.writeline("\r\nYou must be logged in to save preferences.")
-            return
-
-        from ..storage.repositories import UserRepository
-        user_repo = UserRepository()
-
-        await user_repo.update_terminal_settings(
-            self.session.user_id,
-            self.session.capabilities.encoding,
-            self.session.capabilities.cols,
-            self.session.capabilities.rows
-        )
-
-        await self.session.writeline("\r\nTerminal settings saved as defaults.")
-        await self.session.writeline("These will be applied on your next login.")
 
     async def language_settings(self) -> None:
         """Allow user to change interface language"""
