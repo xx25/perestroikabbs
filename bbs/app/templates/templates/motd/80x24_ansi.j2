@@ -19,7 +19,8 @@
 ║    ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝ ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝            BBS   ║
 ╚════════════════════════════════════════════════════════════════════════════╝
 {{ ansi.reset() }}
-{{ ansi.color(fg=3, bold=True) }}Welcome, {{ username }}!{{ ansi.reset() }}  Last: {{ last_login|default("First Visit") }}  Mail: {{ unread_mail|default(0) }}
-
+{{ ansi.color(fg=2) }}{{ t('templates.motd.online') }}: {{ online_now|default(0) }}  {{ t('templates.motd.users') }}: {{ total_users|default(0) }}  {{ t('templates.motd.messages') }}: {{ messages_today|default(0) }}{{ ansi.reset() }}
+{% if caller_id or connect or device %}{{ ansi.color(fg=3) }}{% if caller_id %}{{ t('templates.motd.caller') }}: {{ caller_id }}  {% endif %}{% if connect %}{{ connect }}  {% endif %}{% if device %}{{ device }}{% endif %}{{ ansi.reset() }}
+{% endif %}
 {{ ansi.color(fg=7) }}{{ macros.press_any_key(78) }}{{ ansi.reset() }}
 {% endblock %}

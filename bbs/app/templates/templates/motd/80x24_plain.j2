@@ -11,24 +11,19 @@
 |                                                                            |
 +============================================================================+
 
-Welcome back, {{ username }}!
+{{ t('templates.motd.system_status') }}:
+  {{ t('templates.motd.users') }}: {{ total_users|default(0)|rjust(5) }}    {{ t('templates.motd.messages') }}: {{ messages_today|default(0)|rjust(4) }}
+  {{ t('templates.motd.online') }}:  {{ online_now|default(0)|rjust(5) }}    {{ t('templates.motd.files') }}:   {{ files_shared|default(0)|rjust(4) }}
+{% if caller_id or connect or device %}
 
-System Statistics:
-  Total Users: {{ total_users|default(0)|rjust(5) }}    Messages Today: {{ messages_today|default(0)|rjust(4) }}
-  Online Now:  {{ online_now|default(0)|rjust(5) }}    Files Shared:   {{ files_shared|default(0)|rjust(4) }}
-
-Your Status:
-  Last Login:    {{ last_login|default("First Visit") }}
-  Access Level:  {{ access_level|default(1) }}
-  Unread Mail:   {{ unread_mail|default(0) }} message(s)
-
+{{ t('templates.motd.connection') }}:
+{% if caller_id %}  {{ t('templates.motd.caller') }}: {{ caller_id }}
+{% endif %}{% if connect %}  {{ connect }}
+{% endif %}{% if device %}  {{ t('templates.motd.device') }}: {{ device }}
+{% endif %}{% endif %}
 {% if system_news %}
-======================= System News =======================
+======================= {{ t('templates.motd.news') }} =======================
 {{ system_news|wordwrap(76) }}
-{% endif %}
-
-{% if is_birthday %}
-*** HAPPY BIRTHDAY! ***
 {% endif %}
 
 {{ macros.press_any_key(80) }}

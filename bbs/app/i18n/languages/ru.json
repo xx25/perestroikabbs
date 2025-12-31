@@ -10,7 +10,8 @@
     "no": "Нет",
     "back": "Назад",
     "cancel": "Отмена",
-    "continue": "Нажмите любую клавишу для продолжения...",
+    "continue": "Нажмите любую клавишу...",
+    "continue_short": "[Любая]",
     "invalid_choice": "Неверный выбор.",
     "invalid_input": "Неверный ввод.",
     "error": "Ошибка: {message}",
@@ -246,5 +247,18 @@
     "commands": "Команды терминала",
     "cmd_interrupt": "Ctrl-C: Прервать текущую операцию",
     "cmd_pause": "Ctrl-S/Ctrl-Q: Приостановить/возобновить вывод"
+  },
+  "templates": {
+    "motd": {
+      "system_status": "Статус системы",
+      "connection": "Соединение",
+      "online": "В сети",
+      "users": "Польз.",
+      "messages": "Сообщ.",
+      "files": "Файлов",
+      "caller": "Звонящий",
+      "device": "Устройство",
+      "news": "НОВОСТИ"
+    }
   }
 }

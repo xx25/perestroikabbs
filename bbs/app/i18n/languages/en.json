@@ -11,6 +11,7 @@
     "back": "Back",
     "cancel": "Cancel",
     "continue": "Press any key to continue...",
+    "continue_short": "[Any Key]",
     "invalid_choice": "Invalid choice.",
     "invalid_input": "Invalid input.",
     "error": "Error: {message}",
@@ -245,5 +246,18 @@
     "commands": "Terminal Commands",
     "cmd_interrupt": "Ctrl-C: Interrupt current operation",
     "cmd_pause": "Ctrl-S/Ctrl-Q: Pause/resume output"
+  },
+  "templates": {
+    "motd": {
+      "system_status": "System Status",
+      "connection": "Connection",
+      "online": "Online",
+      "users": "Users",
+      "messages": "Messages",
+      "files": "Files",
+      "caller": "Caller",
+      "device": "Device",
+      "news": "NEWS"
+    }
   }
 }

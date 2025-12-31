@@ -392,18 +392,22 @@ class LoginUI:
         sys_repo = SystemRepository()
         stats = await sys_repo.get_stats()
 
-        # Prepare context
+        # Get mgetty connection info if available
+        mgetty = self.session.data.get('mgetty')
+
+        # Prepare context - only include non-empty mgetty values
         context = {
-            'username': self.session.username or 'Guest',
             'total_users': stats.get('total_users', 0),
             'online_now': stats.get('active_sessions', 0),
             'messages_today': stats.get('messages_today', 0),
             'files_shared': stats.get('total_files', 0),
-            'last_login': self.session.last_activity.strftime("%Y-%m-%d %H:%M") if self.session.last_activity else "First Visit",
-            'access_level': self.session.access_level,
-            'unread_mail': 0,  # TODO: Get actual unread count
             'system_news': await self._get_system_news(),
-            'is_birthday': False  # TODO: Check if it's user's birthday
+            # Connection info (only if not empty)
+            'caller_id': (mgetty.caller_id if mgetty and mgetty.caller_id else ''),
+            'caller_name': (mgetty.caller_name if mgetty and mgetty.caller_name else ''),
+            'connect': (mgetty.connect if mgetty and mgetty.connect else ''),
+            'device': (mgetty.device if mgetty and mgetty.device else ''),
+            'remote_addr': self.session.remote_addr or '',
         }
 
         # Render MOTD template

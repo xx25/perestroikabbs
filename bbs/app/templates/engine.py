@@ -10,6 +10,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape, TemplateNot
 from .converters import CharsetConverter
 from .helpers import ANSIHelper, BoxDrawingHelper
 from ..display import DisplayMode, DisplayConfig
+from ..i18n import Translator
 from ..utils.logger import get_logger
 
 logger = get_logger("templates.engine")
@@ -52,6 +53,9 @@ class TemplateEngine:
         # Cache for compiled templates
         self.cache: Dict[str, Any] = {}
 
+        # Cache for translators by language
+        self._translators: Dict[str, Translator] = {}
+
         logger.info(f"Template engine initialized with directory: {self.template_dir}")
 
     def _register_filters(self):
@@ -60,6 +64,12 @@ class TemplateEngine:
         self.env.filters['ljust'] = lambda s, w, f=' ': str(s).ljust(w, f)
         self.env.filters['rjust'] = lambda s, w, f=' ': str(s).rjust(w, f)
         self.env.filters['indent'] = lambda s, w: '\n'.join(' ' * w + line for line in str(s).split('\n'))
+
+    def _get_translator(self, language: str) -> Translator:
+        """Get or create a translator for the given language."""
+        if language not in self._translators:
+            self._translators[language] = Translator(language=language)
+        return self._translators[language]
 
     def get_template_path(self, template_name: str, display_mode: DisplayMode) -> str:
         """
@@ -97,6 +107,9 @@ class TemplateEngine:
         """
         template_path = self.get_template_path(template_name, display_mode)
 
+        # Get translator for this language
+        translator = self._get_translator(language)
+
         # Add display context
         context = context.copy()
         context.update({
@@ -105,7 +118,8 @@ class TemplateEngine:
             'height': 24,
             'display_mode': display_mode.value,
             'encoding': encoding,
-            'language': language
+            'language': language,
+            't': translator.t,  # Translation function for templates
         })
 
         # Try to get cached template

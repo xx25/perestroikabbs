@@ -9,28 +9,22 @@
 ╚══════════════════════════════════════╝
 {{ ansi.reset() }}
 
-{{ ansi.color(fg=3, bold=True) }}Welcome back!{{ ansi.reset() }}
-{{ ansi.color(fg=3) }}{{ username }}{{ ansi.reset() }}
+{{ ansi.color(fg=7) }}═══ {{ t('templates.motd.system_status') }} ═══{{ ansi.reset() }}
+{{ ansi.color(fg=2) }}{{ t('templates.motd.online') }}:{{ ansi.reset() }} {{ online_now|default(0) }}
+{{ ansi.color(fg=2) }}{{ t('templates.motd.users') }}:{{ ansi.reset() }}  {{ total_users|default(0) }}
+{{ ansi.color(fg=2) }}{{ t('templates.motd.messages') }}:{{ ansi.reset() }}     {{ messages_today|default(0) }}
+{{ ansi.color(fg=2) }}{{ t('templates.motd.files') }}:{{ ansi.reset() }}        {{ files_shared|default(0) }}
+{% if caller_id or connect or device %}
 
-{{ ansi.color(fg=7) }}═══ System Status ═══{{ ansi.reset() }}
-{{ ansi.color(fg=2) }}Users Online:{{ ansi.reset() }} {{ online_now|default(0) }}
-{{ ansi.color(fg=2) }}Total Users:{{ ansi.reset() }}  {{ total_users|default(0) }}
-{{ ansi.color(fg=2) }}Messages:{{ ansi.reset() }}     {{ messages_today|default(0) }}
-{{ ansi.color(fg=2) }}Files:{{ ansi.reset() }}        {{ files_shared|default(0) }}
-
-{{ ansi.color(fg=6) }}═══ Your Account ═══{{ ansi.reset() }}
-Last Visit:
-  {{ last_login|default("First Visit")|wordwrap(36)|indent(2) }}
-Level: {{ access_level|default(1) }}
-Mail: {{ ansi.color(fg=1, bold=True) if unread_mail }}{{ unread_mail|default(0) }} new{{ ansi.reset() }}
-
+{{ ansi.color(fg=6) }}═══ {{ t('templates.motd.connection') }} ═══{{ ansi.reset() }}
+{% if caller_id %}{{ ansi.color(fg=3) }}{{ t('templates.motd.caller') }}: {{ caller_id }}{{ ansi.reset() }}
+{% endif %}{% if connect %}{{ ansi.color(fg=3) }}{{ connect }}{{ ansi.reset() }}
+{% endif %}{% if device %}{{ ansi.color(fg=3) }}{{ t('templates.motd.device') }}: {{ device }}{{ ansi.reset() }}
+{% endif %}{% endif %}
 {% if system_news %}
-{{ ansi.color(fg=5) }}═══ NEWS ═══{{ ansi.reset() }}
-{{ system_news|wordwrap(38) }}
-{% endif %}
 
-{% if is_birthday %}
-{{ ansi.color(fg=3, blink=True) }}★ HAPPY BIRTHDAY! ★{{ ansi.reset() }}
+{{ ansi.color(fg=5) }}═══ {{ t('templates.motd.news') }} ═══{{ ansi.reset() }}
+{{ system_news|wordwrap(38) }}
 {% endif %}
 
 {{ ansi.color(fg=7) }}{{ macros.press_any_key(40) }}{{ ansi.reset() }}
