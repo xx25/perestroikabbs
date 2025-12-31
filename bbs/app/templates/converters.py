@@ -77,6 +77,12 @@ class CharsetConverter:
         }
     }
 
+    # Encodings that need ASCII box char fallback (no box drawing in charset)
+    ASCII_BOX_ENCODINGS = [
+        'koi8-r', 'koi8-u', 'windows-1251', 'iso-8859-5',
+        'x-mac-cyrillic', 'ascii', 'us-ascii'
+    ]
+
     # ANSI escape sequence pattern
     ANSI_PATTERN = re.compile(r'\x1b\[[0-9;]*[mGKHJl]')
 
@@ -100,17 +106,21 @@ class CharsetConverter:
         if not ansi_enabled:
             text = self._strip_ansi(text)
 
+        # Convert newlines to CRLF for telnet compatibility
+        text = text.replace('\r\n', '\n').replace('\n', '\r\n')
+
+        encoding_lower = encoding.lower()
+
         # Convert box drawing characters based on encoding
-        if encoding == 'utf-8':
+        if encoding_lower == 'utf-8':
             # UTF-8 can handle everything
             pass
-        elif encoding == 'cp437' or '437' in encoding.lower():
+        elif encoding_lower == 'cp437' or '437' in encoding_lower:
             text = self._convert_box_chars(text, 'cp437')
-        elif encoding == 'cp866' or '866' in encoding.lower():
+        elif encoding_lower == 'cp866' or '866' in encoding_lower:
             text = self._convert_box_chars(text, 'cp866')
-        elif encoding == 'x-mac-cyrillic' or 'mac-cyrillic' in encoding.lower():
-            text = self._convert_box_chars(text, 'x-mac-cyrillic')
-        elif encoding in ['ascii', 'us-ascii'] or not self._supports_extended_ascii(encoding):
+        elif any(enc in encoding_lower for enc in self.ASCII_BOX_ENCODINGS):
+            # These encodings don't have box drawing chars, use ASCII
             text = self._convert_box_chars(text, 'ascii')
         else:
             # For other encodings, try to preserve what we can
