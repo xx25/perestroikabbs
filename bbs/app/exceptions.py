@@ -44,6 +44,12 @@ class ConnectionError(BBSException):
     pass
 
 
+class ConnectionClosedError(ConnectionError):
+    """Connection has been closed (client disconnected)."""
+
+    pass
+
+
 class StorageError(BBSException):
     """Database/repository errors (query failures, constraint violations)."""
 

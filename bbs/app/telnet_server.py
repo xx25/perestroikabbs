@@ -4,6 +4,7 @@ from typing import Dict, Optional
 import telnetlib3
 
 from .encoding import CharsetManager
+from .exceptions import ConnectionClosedError
 from .session import Session, SessionState
 from .ui.login import LoginUI
 from .ui.menu import MainMenu
@@ -39,19 +40,24 @@ class TelnetServer:
 
             if authenticated:
                 session.state = SessionState.AUTHENTICATED
-                await session.writeline(f"\r\nWelcome back, {session.username}!")
+                await session.writeline(f"\r\n{session.t('login.welcome_back', username=session.username)}")
                 await asyncio.sleep(1)
 
                 menu = MainMenu(session)
                 await menu.run()
             else:
-                await session.writeline("\r\nGoodbye!")
+                await session.writeline(f"\r\n{session.t('common.goodbye')}")
 
         except asyncio.CancelledError:
             logger.info(f"Session {session.id} cancelled")
+        except ConnectionClosedError:
+            logger.info(f"Session {session.id} connection closed by client")
         except Exception as e:
             logger.error(f"Session {session.id} error: {e}", exc_info=True)
-            await session.writeline("\r\nAn error occurred. Disconnecting...")
+            try:
+                await session.writeline("\r\nAn error occurred. Disconnecting...")
+            except (ConnectionClosedError, OSError):
+                pass  # Connection already dead
         finally:
             await session.disconnect()
             del self.sessions[session.id]

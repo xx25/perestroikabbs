@@ -12,6 +12,7 @@ from typing import Optional, TYPE_CHECKING
 from telnetlib3 import TelnetReader, TelnetWriter, DO, WILL, BINARY, ECHO, NAWS, TTYPE
 
 from ..encoding import CodecIO
+from ..exceptions import ConnectionClosedError
 from ..utils.logger import get_logger
 from .state import SessionData, SessionState, SessionTransport, ClientCapabilities
 
@@ -56,6 +57,18 @@ class SessionIO:
         """Update last activity timestamp on state."""
         if self._state:
             self._state.update_activity()
+
+    def _check_connection(self) -> None:
+        """Check if connection is still alive, raise ConnectionClosedError if not."""
+        if not self.writer:
+            raise ConnectionClosedError("Writer is None")
+
+        # Check if transport is closing or closed
+        transport = getattr(self.writer, 'transport', None)
+        if transport:
+            if transport.is_closing():
+                session_id = self._state.id if self._state else "unknown"
+                raise ConnectionClosedError(f"Connection closing for session {session_id}")
 
     async def negotiate(self) -> None:
         """Perform telnet protocol negotiation."""
@@ -127,9 +140,13 @@ class SessionIO:
         Write text data with proper encoding.
 
         For text output only. Binary transfers must use write_raw().
+        Raises ConnectionClosedError if the connection is closed.
         """
         if not self.writer:
             return
+
+        # Check connection before attempting write
+        self._check_connection()
 
         if self.transport_type == SessionTransport.SSH:
             # SSH: writer handles UTF-8 encoding, pass strings directly
@@ -207,6 +224,9 @@ class SessionIO:
         if not self.reader:
             return ""
 
+        # Check connection before attempting read
+        self._check_connection()
+
         raw = await self.reader.read(size)
         if not raw:
             return ""
@@ -225,9 +245,13 @@ class SessionIO:
 
         For telnet sessions, IAC (0xFF) bytes are escaped as 0xFF 0xFF.
         SSH and STDIO sessions send raw bytes without escaping.
+        Raises ConnectionClosedError if the connection is closed.
         """
         if not self.writer:
             return
+
+        # Check connection before attempting write
+        self._check_connection()
 
         if self.transport_type == SessionTransport.TELNET:
             data = data.replace(b'\xff', b'\xff\xff')

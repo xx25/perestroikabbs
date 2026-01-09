@@ -191,6 +191,7 @@ sync_files() {
         --exclude='*.log' \
         --exclude='.venv' \
         --exclude='venv' \
+        --exclude='config.toml' \
         ./ "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PATH}/"
 
     success "Files synced"
@@ -230,20 +231,28 @@ ENVEOF"
     ssh "${REMOTE_USER}@${REMOTE_HOST}" "chmod 600 ${REMOTE_PATH}/.env"
     success "Environment file updated"
 
-    # Regenerate config and restart
-    generate_config
+    # Update config DSN and restart
+    update_config_dsn
 
     log "Restarting BBS..."
     remote_exec "docker compose -f ${COMPOSE_FILE} restart"
     success "BBS restarted with new database configuration"
 }
 
-# Generate config.toml from .env file
-generate_config() {
-    log "Generating config.toml from environment..."
+# Update DSN in config.toml from .env file
+update_config_dsn() {
+    log "Updating database DSN in config.toml..."
 
-    # Read database credentials from .env and generate config
-    ssh "${REMOTE_USER}@${REMOTE_HOST}" "cd ${REMOTE_PATH} && source .env && cat > config.toml << CONFIGEOF
+    # Check if config.toml exists on remote
+    if ssh "${REMOTE_USER}@${REMOTE_HOST}" "test -f ${REMOTE_PATH}/config.toml"; then
+        # Update DSN in-place using sed
+        ssh "${REMOTE_USER}@${REMOTE_HOST}" "cd ${REMOTE_PATH} && source .env && \
+            sed -i \"s|^dsn = .*|dsn = \\\"mysql+aiomysql://\${DB_USER}:\${DB_PASSWORD}@\${DB_HOST}:\${DB_PORT}/\${DB_NAME}\\\"|\" config.toml"
+        success "DSN updated in existing config.toml"
+    else
+        # No config exists, generate from template
+        log "No config.toml found, generating from template..."
+        ssh "${REMOTE_USER}@${REMOTE_HOST}" "cd ${REMOTE_PATH} && source .env && cat > config.toml << 'CONFIGEOF'
 [server]
 host = \"0.0.0.0\"
 port = 2323
@@ -274,6 +283,7 @@ ckermit_path = \"/usr/bin/kermit\"
 download_root = \"/var/lib/bbs/files\"
 upload_root = \"/var/lib/bbs/uploads\"
 max_upload_size = 10485760
+allowed_extensions = [\".txt\", \".zip\", \".arc\", \".lha\", \".gif\", \".jpg\", \".png\", \".ans\", \".rip\"]
 
 [security]
 argon2_time_cost = 3
@@ -288,14 +298,44 @@ min_password_length = 8
 [charset]
 default_encoding = \"utf-8\"
 supported_encodings = [\"utf-8\", \"ascii\", \"cp866\", \"koi8-r\", \"koi8-u\", \"windows-1251\", \"iso-8859-5\", \"x-mac-cyrillic\"]
+charset_preview_text = \"Проверка кодировки\"
+charset_preview_translit = \"Proverka kodirovki\"
+
+[language]
+default_language = \"en\"
+supported_languages = [\"en\", \"ru\"]
+
+[chat]
+max_message_length = 500
+max_rooms = 50
+default_room = \"main\"
+enable_whispers = true
+enable_moderator_channel = true
+
+[boards]
+max_subject_length = 100
+max_post_length = 10000
+posts_per_page = 20
+enable_attachments = true
+max_attachment_size = 1048576
 
 [logging]
 level = \"INFO\"
+format = \"%(asctime)s - %(name)s - %(levelname)s - %(message)s\"
 file_path = \"/var/log/bbs/perestroika.log\"
 max_bytes = 10485760
 backup_count = 5
+
+[ripscrip]
+enable = true
+detect_signature = true
+fallback_to_ansi = true
 CONFIGEOF"
-    success "Config generated"
+        # Now substitute the env vars
+        ssh "${REMOTE_USER}@${REMOTE_HOST}" "cd ${REMOTE_PATH} && source .env && \
+            sed -i \"s|\\\${DB_USER}|\${DB_USER}|g; s|\\\${DB_PASSWORD}|\${DB_PASSWORD}|g; s|\\\${DB_HOST}|\${DB_HOST}|g; s|\\\${DB_PORT}|\${DB_PORT}|g; s|\\\${DB_NAME}|\${DB_NAME}|g\" config.toml"
+        success "Config generated from template"
+    fi
 }
 
 # Full deployment
@@ -313,8 +353,8 @@ deploy() {
 
     sync_files
 
-    # Generate config.toml from .env
-    generate_config
+    # Update DSN in config.toml (or generate if missing)
+    update_config_dsn
 
     log "Building Docker image..."
     remote_exec "docker compose -f ${COMPOSE_FILE} build"

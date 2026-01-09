@@ -1,4 +1,5 @@
 from logging.config import fileConfig
+from pathlib import Path
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
@@ -13,6 +14,23 @@ config = context.config
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Read DSN from config.toml (same as BBS app uses)
+# This overrides the sqlalchemy.url in alembic.ini
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
+
+config_path = Path(__file__).parent.parent / "config.toml"
+if config_path.exists():
+    with open(config_path, "rb") as f:
+        toml_config = tomllib.load(f)
+    dsn = toml_config.get("db", {}).get("dsn", "")
+    if dsn:
+        # Convert async DSN to sync for alembic (aiomysql -> pymysql)
+        dsn = dsn.replace("mysql+aiomysql://", "mysql+pymysql://")
+        config.set_main_option("sqlalchemy.url", dsn)
 
 # add your model's MetaData object here
 # for 'autogenerate' support

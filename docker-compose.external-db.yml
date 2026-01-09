@@ -37,7 +37,8 @@ services:
         max-size: "10m"
         max-file: "3"
     healthcheck:
-      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost', 2323)); s.close()"]
+      # Quick port check with immediate close (1s timeout, no wait for response)
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.settimeout(1); s.connect(('localhost', 2323)); s.close()"]
       interval: 30s
       timeout: 10s
       retries: 3
